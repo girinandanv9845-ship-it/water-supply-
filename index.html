@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Water Delivery</title>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+  <!-- Socket.io -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <!-- Razorpay -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <!-- Google Maps -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDQbL7GPdzBJzbKf-IbJyZB_UQtPR9Eqcc&libraries=places"></script>
+
+  <style>
+    body { background:#f5f5f5; }
+    .card-option {
+      cursor:pointer;
+      transition:0.3s;
+      border:2px solid transparent;
+    }
+    .card-option:hover { transform:scale(1.05); }
+    .selected { border:2px solid green; }
+  </style>
+</head>
+<body>
+
+<div class="container mt-5" id="authSection">
+  <h3 class="text-center">Login / Signup</h3>
+  <input type="text" id="name" class="form-control mb-2" placeholder="Name">
+  <input type="text" id="phone" class="form-control mb-2" placeholder="Phone">
+  <button class="btn btn-success w-100" onclick="login()">Continue</button>
+</div>
+
+<div class="container mt-4" id="appSection" style="display:none;">
+  
+  <div class="d-flex justify-content-between">
+    <h2>💧 Water Delivery</h2>
+    <button class="btn btn-danger" onclick="logout()">Logout</button>
+  </div>
+
+  <!-- Address -->
+  <input type="text" id="address" class="form-control mt-3" placeholder="Enter Address">
+  <button class="btn btn-secondary mt-2" onclick="getLocation()">Use My Location</button>
+
+  <!-- Load Selection -->
+  <h5 class="mt-3">Select Load</h5>
+  <div class="row">
+    <div class="col-md-6">
+      <div id="halfCard" class="card p-3 card-option" onclick="selectLoad('Half',300,'halfCard')">
+        Half Load (2000L) - ₹300
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div id="fullCard" class="card p-3 card-option" onclick="selectLoad('Full',600,'fullCard')">
+        Full Load (4000L) - ₹600
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary mt-3 w-100" onclick="bookWater()">Book Now</button>
+
+  <h4 class="mt-4">My Orders</h4>
+  <ul id="orders" class="list-group"></ul>
+</div>
+
+<script>
+const socket = io();
+
+let selectedLoad = '';
+let price = 0;
+let user = JSON.parse(localStorage.getItem('user'));
+
+if(user) showApp();
+
+/* ================= LOGIN ================= */
+function login(){
+  const name = document.getElementById('name').value;
+  const phone = document.getElementById('phone').value;
+
+  fetch('/api/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,phone})
+  })
+  .then(res=>res.json())
+  .then(data=>{
+    localStorage.setItem('user',JSON.stringify(data));
+    user=data;
+    showApp();
+  });
+}
+
+/* ================= LOGOUT ================= */
+function logout(){
+  localStorage.removeItem('user');
+  location.reload();
+}
+
+/* ================= SHOW APP ================= */
+function showApp(){
+  document.getElementById('authSection').style.display='none';
+  document.getElementById('appSection').style.display='block';
+  getOrders();
+}
+
+/* ================= SELECT LOAD ================= */
+function selectLoad(load,p,cardId){
+  selectedLoad = load;
+  price = p;
+
+  document.getElementById('halfCard').classList.remove('selected');
+  document.getElementById('fullCard').classList.remove('selected');
+
+  document.getElementById(cardId).classList.add('selected');
+}
+
+/* ================= LOCATION ================= */
+function getLocation(){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    document.getElementById('address').value = `Lat: ${lat}, Lng: ${lng}`;
+  });
+}
+
+/* ================= BOOK ORDER ================= */
+function bookWater(){
+  const address = document.getElementById('address').value;
+
+  if(!selectedLoad){
+    alert("Please select load");
+    return;
+  }
+
+  fetch('/api/order',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      userId:user._id,
+      load:selectedLoad,
+      price:price,
+      address:address,
+      status:'Booked'
+    })
+  })
+  .then(res=>res.json())
+  .then(()=>{
+    alert('Order placed');
+    getOrders();
+  });
+}
+
+/* ================= PAYMENT ================= */
+function pay(amount){
+  fetch('/api/payment',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({amount})
+  })
+  .then(res=>res.json())
+  .then(order=>{
+
+    const options = {
+      key: "YOUR_KEY_ID", // replace with your Razorpay key
+      amount: order.amount,
+      currency: "INR",
+      name: "Water Delivery",
+      description: "Order Payment",
+      order_id: order.id,
+      handler: function (){
+        alert("Payment Successful!");
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+  });
+}
+
+/* ================= GET ORDERS ================= */
+function getOrders(){
+  fetch('/api/orders/'+user._id)
+  .then(res=>res.json())
+  .then(data=>{
+    const list=document.getElementById('orders');
+    list.innerHTML='';
+
+    data.forEach(o=>{
+      list.innerHTML += `
+        <li class="list-group-item">
+          ${o.load} | ₹${o.price} | ${o.status}
+          ${o.status === 'Booked' ? `<button onclick="pay(${o.price})" class="btn btn-sm btn-success ms-2">Pay Now</button>` : ''}
+        </li>`;
+    });
+  });
+}
+
+/* ================= REAL-TIME ================= */
+socket.on('orderUpdate', ()=>{
+  getOrders();
+});
+
+/* ================= AUTO REFRESH ================= */
+setInterval(()=>{
+  if(user) getOrders();
+},5000);
+
+</script>
+
+</body>
+</html>

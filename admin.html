@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>👨‍💼 Admin Dashboard</h2>
+<ul id="orders"></ul>
+
+<script>
+function loadOrders(){
+  fetch('/api/admin/orders')
+  .then(res=>res.json())
+  .then(data=>{
+    document.getElementById('orders').innerHTML = data.map(o=>
+      `<li>
+        ${o.load} | ₹${o.price} | ${o.address} | ${o.status} | 
+        ${o.paid ? "✅ Paid" : "❌ Not Paid"}
+      </li>`
+    ).join('');
+  });
+}
+
+setInterval(loadOrders,3000);
+loadOrders();
+</script>
+
+</body>
+</html>

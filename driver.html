@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Driver Panel</title>
+</head>
+<body>
+
+<h2>🚚 Driver Dashboard</h2>
+<ul id="orders"></ul>
+
+<script>
+function loadOrders(){
+  fetch('/api/admin/orders')
+  .then(res=>res.json())
+  .then(data=>{
+    document.getElementById('orders').innerHTML = data.map(o=>
+      `<li>
+        ${o.load} | ${o.address} | ${o.status}
+        <button onclick="update('${o._id}','On the way')">Start</button>
+        <button onclick="update('${o._id}','Delivered')">Done</button>
+      </li>`
+    ).join('');
+  });
+}
+
+function update(id,status){
+  fetch('/api/driver/update',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id,status})
+  });
+}
+
+setInterval(loadOrders,3000);
+loadOrders();
+</script>
+
+</body>
+</html>
