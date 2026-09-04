@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a1a29">
+<title>AquaFlow - Operations Console</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%F0%9F%92%A7</text></svg>">
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<section id="loginView">
+  <div style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#0a1a29,#19556d)">
+    <div style="width:100%;max-width:400px">
+      <div class="center" style="color:#fff;margin-bottom:22px">
+        <h1 style="font-size:1.6rem;margin-bottom:2px">AquaFlow Operations</h1>
+        <p class="small" style="opacity:.75;margin:0">Administrator sign-in</p>
+      </div>
+      <div class="card">
+        <form id="adminLoginForm" novalidate>
+          <div class="field">
+            <label class="label" for="adminPhone">Admin mobile number</label>
+            <input class="input" id="adminPhone" type="tel" inputmode="numeric" autocomplete="username" maxlength="14" required>
+          </div>
+          <div class="field mt-1">
+            <label class="label" for="adminPassword">Password</label>
+            <input class="input" id="adminPassword" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="field-error hidden mt-1" id="loginError"></div>
+          <button class="btn btn-primary btn-block mt-2" type="submit" id="adminLoginBtn">Sign in</button>
+        </form>
+        <p class="tiny muted center mt-2 mb-0">
+          Credentials are created by the seed script. Run <code>npm run db:seed</code> to see them.
+        </p>
+      </div>
+      <p class="center small mt-2"><a href="/" style="color:rgba(255,255,255,.75)">&larr; Customer app</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONSOLE ================= -->
+<section id="consoleView" class="hidden">
+  <header class="dash-header">
+    <div class="row-between">
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5s6.5 7 6.5 11.2A6.5 6.5 0 0 1 12 20.2a6.5 6.5 0 0 1-6.5-6.5C5.5 9.5 12 2.5 12 2.5z" fill="#fff" opacity=".95"/></svg>
+        </span>
+        <span>AquaFlow<div class="sub">Operations console</div></span>
+      </div>
+      <div class="row">
+        <span class="badge badge-success" id="liveDot">Live</span>
+        <button class="btn btn-sm" id="adminLogout" style="background:rgba(255,255,255,.14);color:#fff">Sign out</button>
+      </div>
+    </div>
+    <nav class="dash-nav">
+      <button class="dash-tab active" data-view="dashboard">Dashboard</button>
+      <button class="dash-tab" data-view="orders">Orders</button>
+      <button class="dash-tab" data-view="live">Live map</button>
+      <button class="dash-tab" data-view="drivers">Drivers</button>
+      <button class="dash-tab" data-view="vehicles">Tankers</button>
+      <button class="dash-tab" data-view="products">Pricing</button>
+      <button class="dash-tab" data-view="customers">Customers</button>
+      <button class="dash-tab" data-view="payments">Payments</button>
+      <button class="dash-tab" data-view="areas">Service areas</button>
+      <button class="dash-tab" data-view="settings">Chatbot &amp; info</button>
+      <button class="dash-tab" data-view="support">Support log</button>
+    </nav>
+  </header>
+
+  <div id="demoBanner" class="demo-banner hidden">
+    DEMO MODE is active - OTP codes are exposed and payments are simulated. Set NODE_ENV=production before going live.
+  </div>
+
+  <main class="wide-shell" style="padding-top:16px">
+    <div id="viewHost"></div>
+  </main>
+</section>
+
+<script src="/socket.io/socket.io.js" onerror="window.__noSocket=true"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/maps.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

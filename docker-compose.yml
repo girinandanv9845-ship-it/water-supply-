@@ -1,0 +1,38 @@
+# Optional: run PostgreSQL in Docker instead of installing it natively.
+#
+#   docker compose up -d          start
+#   docker compose logs -f db     watch
+#   docker compose down           stop (data is kept)
+#   docker compose down -v        stop and DELETE all data
+#
+# Host port 5434 is used deliberately: 5432 is the locally installed PostgreSQL 18
+# and 5433 is already taken by another project's container (elevateai-postgres).
+# Container name and volume are namespaced to this project, so nothing here
+# touches any other stack. Use this DATABASE_URL in .env:
+#   postgresql://aquaflow:aquaflow_dev_password@localhost:5434/water_app
+#
+# Only PostgreSQL is defined. Redis is not included because a single-process
+# Socket.IO server does not need an adapter; add it only when you scale to
+# multiple app instances (see README -> Scaling).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aquaflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aquaflow
+      POSTGRES_PASSWORD: aquaflow_dev_password
+      POSTGRES_DB: water_app
+    ports:
+      - '5434:5432'
+    volumes:
+      - aquaflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aquaflow -d water_app']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  aquaflow_pgdata:

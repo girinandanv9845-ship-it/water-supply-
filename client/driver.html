@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1a29">
+<title>AquaFlow - Driver</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%F0%9F%9A%9A</text></svg>">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ================= LOGIN ================= -->
+  <section id="loginView">
+    <div style="min-height:100vh;display:grid;align-content:center;padding:24px;background:linear-gradient(160deg,#0a1a29,#146885)">
+      <div class="center" style="color:#fff;margin-bottom:24px">
+        <div style="font-size:44px">&#128666;</div>
+        <h1 style="font-size:1.6rem;margin-bottom:2px">Driver</h1>
+        <p class="small" style="opacity:.75;margin:0">Sign in with your registered mobile number</p>
+      </div>
+
+      <div class="card">
+        <div id="dStepPhone">
+          <form id="dPhoneForm" novalidate>
+            <div class="field">
+              <label class="label" for="dPhoneInput">Mobile number</label>
+              <input class="input" id="dPhoneInput" type="tel" inputmode="numeric" autocomplete="tel" maxlength="14" required>
+              <div class="field-error hidden" id="dPhoneError"></div>
+            </div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" id="dSendOtp">Send code</button>
+          </form>
+        </div>
+
+        <div id="dStepOtp" class="hidden">
+          <button class="btn-link" id="dBack" type="button">&larr; Change number</button>
+          <h2 class="mt-1">Enter the code</h2>
+          <div id="dDemoCode" class="alert alert-warn hidden mb-1"></div>
+          <form id="dOtpForm" novalidate>
+            <div class="field">
+              <input class="input otp-input" id="dOtpInput" type="text" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+            </div>
+            <div class="field-error hidden mt-1" id="dOtpError"></div>
+            <button class="btn btn-primary btn-block mt-2" type="submit" id="dVerify">Sign in</button>
+          </form>
+        </div>
+      </div>
+      <p class="center small mt-2"><a href="/" style="color:rgba(255,255,255,.7)">&larr; Customer app</a></p>
+    </div>
+  </section>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="driverView" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">&#128666;</span>
+        <span>Driver<div class="sub" id="dName">-</div></span>
+      </div>
+      <button class="btn btn-sm" id="dLogout" style="background:rgba(255,255,255,.14);color:#fff">Sign out</button>
+    </header>
+
+    <div id="dDemoBanner" class="demo-banner hidden">DEMO MODE is active on this server.</div>
+
+    <div class="page">
+
+      <!-- duty + GPS -->
+      <div class="card mb-2">
+        <div class="row-between">
+          <div class="grow">
+            <div class="strong">Duty status</div>
+            <div class="small muted" id="dutyText">Loading...</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="dutyToggle">Go online</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+        <div class="row-between">
+          <div class="grow">
+            <div class="strong">Location sharing</div>
+            <div class="small muted" id="gpsText">Off - customers cannot see your tanker</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="gpsToggle">Turn on</button>
+        </div>
+        <div id="gpsAlert" class="alert alert-warn mt-2 hidden"></div>
+      </div>
+
+      <div class="row-between mb-1">
+        <h2 class="mb-0">My deliveries</h2>
+        <div class="row" style="gap:4px">
+          <button class="dash-tab active" data-scope="active" style="background:var(--aqua-100);color:var(--aqua-800)">Active</button>
+          <button class="dash-tab" data-scope="history" style="background:var(--surface-2);color:var(--ink-3)">History</button>
+        </div>
+      </div>
+      <div id="jobList"></div>
+    </div>
+  </section>
+</div>
+
+<script src="/socket.io/socket.io.js" onerror="window.__noSocket=true"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/maps.js"></script>
+<script src="/js/driver.js"></script>
+</body>
+</html>
