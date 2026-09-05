@@ -52,7 +52,8 @@
     var views = {
       dashboard: viewDashboard, orders: viewOrders, live: viewLive, drivers: viewDrivers,
       vehicles: viewVehicles, products: viewProducts, customers: viewCustomers,
-      payments: viewPayments, areas: viewAreas, settings: viewSettings, support: viewSupport,
+      payments: viewPayments, areas: viewAreas, stations: viewStations,
+      settings: viewSettings, support: viewSupport,
     };
     (views[state.view] || viewDashboard)();
   }
@@ -736,6 +737,110 @@
         radiusKm: Number(s.root.querySelector('#aRad').value),
       })
         .then(function () { UI.toast('Service area added', 'success'); s.close(); viewAreas(); })
+        .catch(function (e) { err.textContent = e.message; err.classList.remove('hidden'); })
+        .finally(function () { UI.busy(btn, false); });
+    });
+  }
+
+  /* =========================== WATER STATIONS =========================== */
+
+  function viewStations() {
+    host().innerHTML = section('Water stations',
+      '<button class="btn btn-primary btn-sm" id="addStationBtn">Add station</button>',
+      '<p class="small muted mb-2">Tankers fill at these points. Every new order is matched to the nearest ' +
+      'active station, which becomes the start of the route the customer tracks on the map.</p>' +
+      '<div id="stationsTable"><div class="skeleton skel-card"></div></div>');
+
+    $('addStationBtn').addEventListener('click', function () { openStationSheet(null); });
+
+    API.admin.stations().then(function (stations) {
+      var el = $('stationsTable');
+      if (!stations.length) {
+        UI.empty(el, '', 'No water stations yet',
+          'Add one so deliveries have a starting point. Without any, orders still work but the tracking map shows no route origin.');
+        return;
+      }
+      el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr>' +
+        '<th>Name</th><th>Address</th><th>Coordinates</th><th>Orders</th><th>Active</th><th>Actions</th>' +
+        '</tr></thead><tbody>' + stations.map(function (s) {
+          return '<tr><td class="strong">' + esc(s.name) + '</td>' +
+            '<td>' + esc(s.address || '-') + '</td>' +
+            '<td class="tiny muted">' + s.latitude.toFixed(5) + ', ' + s.longitude.toFixed(5) + '</td>' +
+            '<td>' + s._count.orders + '</td>' +
+            '<td>' + (s.isActive ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-muted">Off</span>') + '</td>' +
+            '<td><button class="btn btn-ghost btn-xs" data-edit-s="' + esc(s.id) + '">Edit</button> ' +
+            '<button class="btn btn-ghost btn-xs" data-toggle-s="' + esc(s.id) + '" data-val="' + (!s.isActive) + '">' +
+            (s.isActive ? 'Disable' : 'Enable') + '</button> ' +
+            '<button class="btn btn-ghost btn-xs" data-del-s="' + esc(s.id) + '">Delete</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+
+      Array.prototype.forEach.call(el.querySelectorAll('[data-toggle-s]'), function (b) {
+        b.addEventListener('click', function () {
+          API.admin.updateStation(b.dataset.toggleS, { isActive: b.dataset.val === 'true' })
+            .then(function () { UI.toast('Station updated', 'success'); viewStations(); })
+            .catch(function (e) { UI.toast(e.message, 'error'); });
+        });
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-edit-s]'), function (b) {
+        b.addEventListener('click', function () {
+          openStationSheet(stations.filter(function (s) { return s.id === b.dataset.editS; })[0]);
+        });
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-del-s]'), function (b) {
+        b.addEventListener('click', function () {
+          UI.confirm('Delete this station? Past orders keep their history, but new orders will route from the next nearest station.',
+            { danger: true, confirmText: 'Delete' }).then(function (yes) {
+              if (!yes) return;
+              API.admin.deleteStation(b.dataset.delS)
+                .then(function () { UI.toast('Station deleted', 'success'); viewStations(); })
+                .catch(function (e) { UI.toast(e.message, 'error'); });
+            });
+        });
+      });
+    }).catch(function (e) { UI.errorState($('stationsTable'), e.message, viewStations); });
+  }
+
+  function openStationSheet(s0) {
+    var isEdit = Boolean(s0);
+    var s = UI.sheet('<h2>' + (isEdit ? 'Edit station' : 'Add water station') + '</h2>' +
+      '<div class="field"><label class="label">Station name</label>' +
+      '<input class="input" id="stName" maxlength="80" value="' + esc(s0 ? s0.name : '') + '" placeholder="Central Filling Point"></div>' +
+      '<div class="field mt-1"><label class="label">Address (optional)</label>' +
+      '<input class="input" id="stAddr" maxlength="300" value="' + esc(s0 ? (s0.address || '') : '') + '"></div>' +
+      '<div class="field mt-1"><label class="label">Latitude</label>' +
+      '<input class="input" id="stLat" type="number" step="0.000001" value="' + (s0 ? s0.latitude : 12.9716) + '"></div>' +
+      '<div class="field mt-1"><label class="label">Longitude</label>' +
+      '<input class="input" id="stLng" type="number" step="0.000001" value="' + (s0 ? s0.longitude : 77.5946) + '"></div>' +
+      '<button class="btn btn-ghost btn-block btn-sm mt-1" id="stGps">Use my current location</button>' +
+      '<div class="field-error hidden mt-1" id="stError"></div>' +
+      '<button class="btn btn-primary btn-block mt-2" id="stSave">' + (isEdit ? 'Save changes' : 'Add station') + '</button>',
+      { center: true });
+
+    s.root.querySelector('#stGps').addEventListener('click', function (ev) {
+      UI.busy(ev.currentTarget, true, 'Locating');
+      AquaMaps.currentPosition()
+        .then(function (p) {
+          s.root.querySelector('#stLat').value = p.latitude.toFixed(6);
+          s.root.querySelector('#stLng').value = p.longitude.toFixed(6);
+          UI.toast('Coordinates set to your location', 'success');
+        })
+        .catch(function (e) { UI.toast(e.message, 'error'); })
+        .finally(function () { UI.busy(ev.currentTarget, false); });
+    });
+
+    s.root.querySelector('#stSave').addEventListener('click', function (ev) {
+      var btn = ev.currentTarget;
+      var err = s.root.querySelector('#stError');
+      err.classList.add('hidden');
+      var body = {
+        name: s.root.querySelector('#stName').value.trim(),
+        address: s.root.querySelector('#stAddr').value.trim(),
+        latitude: Number(s.root.querySelector('#stLat').value),
+        longitude: Number(s.root.querySelector('#stLng').value),
+      };
+      UI.busy(btn, true, 'Saving');
+      (isEdit ? API.admin.updateStation(s0.id, body) : API.admin.createStation(body))
+        .then(function () { UI.toast('Saved', 'success'); s.close(); viewStations(); })
         .catch(function (e) { err.textContent = e.message; err.classList.remove('hidden'); })
         .finally(function () { UI.busy(btn, false); });
     });

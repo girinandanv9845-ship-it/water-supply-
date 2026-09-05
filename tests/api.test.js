@@ -50,13 +50,31 @@ async function signUpCustomer(name = 'Test Customer') {
   return { phone, token: verify.body.data.token, user: verify.body.data.user };
 }
 
+/**
+ * Cached: admin login is rate limited to 10 per 15 minutes, so signing in once
+ * per test would trip the limiter and silently skip the admin coverage.
+ */
+let adminAuth = null;
 async function adminToken() {
+  if (adminAuth) return adminAuth.token;
   const phone = process.env.ADMIN_SEED_PHONE || '9000000001';
   const password = process.env.ADMIN_SEED_PASSWORD;
-  if (!password) return null;
+  if (!password) {
+    adminAuth = { token: null, reason: 'ADMIN_SEED_PASSWORD is not set' };
+    return null;
+  }
   const res = await call('POST', '/api/auth/admin/login', { body: { phone, password } });
-  return res.status === 200 ? res.body.data.token : null;
+  adminAuth = res.status === 200
+    ? { token: res.body.data.token, reason: null }
+    : {
+        token: null,
+        reason: `admin login failed (${res.status} ${res.body.error && res.body.error.code})` +
+          (res.status === 429 ? ' - wait for the 15 minute login window to reset' : ''),
+      };
+  return adminAuth.token;
 }
+
+const skipReason = () => (adminAuth && adminAuth.reason) || 'admin login unavailable';
 
 async function makeAddress(token) {
   const res = await call('POST', '/api/addresses', {
@@ -379,7 +397,7 @@ test('chatbot sees only the signed-in customer own order', async () => {
 test('admin dashboard and driver assignment', async (t) => {
   const token = await adminToken();
   if (!token) {
-    t.skip('Set ADMIN_SEED_PASSWORD in the environment to run admin tests');
+    t.skip(skipReason());
     return;
   }
 
@@ -418,7 +436,7 @@ test('admin dashboard and driver assignment', async (t) => {
 
 test('admin can change pricing and it takes effect for new orders', async (t) => {
   const token = await adminToken();
-  if (!token) { t.skip('Set ADMIN_SEED_PASSWORD to run admin tests'); return; }
+  if (!token) { t.skip(skipReason()); return; }
 
   const products = await call('GET', '/api/admin/products', { token });
   const product = products.body.data[0];

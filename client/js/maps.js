@@ -176,70 +176,145 @@
     } catch (e) { return null; }
   }
 
-  /** Live tracking map: destination pin + moving tanker marker. */
-  function createTracker(el, destination) {
+  /**
+   * Live delivery map.
+   *
+   * Draws the whole journey, not just the remaining leg:
+   *   water station (origin) ---- tanker ----> customer address
+   *
+   * The travelled part of the route is drawn solid and the remaining part
+   * dashed, so a customer can see how far the tanker has come at a glance.
+   *
+   * @param origin  {latitude, longitude, name} of the filling station, or null
+   */
+  function createTracker(el, destination, origin) {
     if (!available) {
-      renderFallback(el, 'Live map preview needs a Google Maps key. Distance and ETA below still update live.');
-      return {
-        available: false,
-        updateDriver: function () {},
-        destroy: function () {},
-      };
+      renderFallback(el, 'Live map preview needs a Google Maps key. The route, distance and ETA below still update live.');
+      return { available: false, updateDriver: function () {}, destroy: function () {} };
     }
 
     el.classList.remove('map-fallback');
-    var map = new global.google.maps.Map(el, {
-      center: { lat: destination.latitude, lng: destination.longitude },
+    var G = global.google.maps;
+
+    var destLatLng = { lat: destination.latitude, lng: destination.longitude };
+    var originLatLng = origin ? { lat: origin.latitude, lng: origin.longitude } : null;
+
+    var map = new G.Map(el, {
+      center: destLatLng,
       zoom: 14,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'cooperative',
     });
 
-    new global.google.maps.Marker({
-      position: { lat: destination.latitude, lng: destination.longitude },
+    // Customer address.
+    new G.Marker({
+      position: destLatLng,
       map: map,
       title: 'Delivery address',
+      zIndex: 3,
       icon: {
-        path: global.google.maps.SymbolPath.CIRCLE,
+        path: G.SymbolPath.CIRCLE,
         scale: 9, fillColor: '#14a2c3', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3,
       },
     });
 
+    // Water station the tanker loads from.
+    if (originLatLng) {
+      new G.Marker({
+        position: originLatLng,
+        map: map,
+        title: origin.name ? 'Water station: ' + origin.name : 'Water station',
+        zIndex: 2,
+        icon: {
+          path: G.SymbolPath.CIRCLE,
+          scale: 8, fillColor: '#0a1a29', fillOpacity: 1, strokeColor: '#8fe6f7', strokeWeight: 3,
+        },
+      });
+    }
+
+    // The planned route, drawn immediately so the customer sees where their
+    // water is coming from even before a driver starts moving.
+    var plannedLine = originLatLng
+      ? new G.Polyline({
+          path: [originLatLng, destLatLng],
+          strokeColor: '#14a2c3', strokeOpacity: 0, strokeWeight: 4, map: map, zIndex: 1,
+          icons: [{
+            icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.55, strokeWeight: 3, scale: 3 },
+            offset: '0', repeat: '14px',
+          }],
+        })
+      : null;
+
     var driverMarker = null;
-    var routeLine = null;
+    var travelledLine = null;
+    var fitted = false;
+
+    function fitAll(extra) {
+      var bounds = new G.LatLngBounds();
+      bounds.extend(destLatLng);
+      if (originLatLng) bounds.extend(originLatLng);
+      if (extra) bounds.extend(extra);
+      map.fitBounds(bounds, 64);
+    }
+
+    if (originLatLng) fitAll();
 
     return {
       available: true,
       map: map,
-      updateDriver: function (lat, lng) {
+      updateDriver: function (lat, lng, heading) {
         var pos = { lat: lat, lng: lng };
+
         if (!driverMarker) {
-          driverMarker = new global.google.maps.Marker({
-            position: pos, map: map, title: 'Your tanker',
+          driverMarker = new G.Marker({
+            position: pos, map: map, title: 'Your tanker', zIndex: 4,
             icon: {
-              path: global.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: 6, fillColor: '#0a1a29', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2,
+              path: G.SymbolPath.FORWARD_CLOSED_ARROW,
+              scale: 6.5, fillColor: '#0a1a29', fillOpacity: 1,
+              strokeColor: '#fff', strokeWeight: 2,
+              rotation: Number.isFinite(heading) ? heading : 0,
             },
           });
         } else {
           driverMarker.setPosition(pos);
+          if (Number.isFinite(heading)) {
+            var icon = driverMarker.getIcon();
+            icon.rotation = heading;
+            driverMarker.setIcon(icon);
+          }
         }
 
-        if (routeLine) routeLine.setMap(null);
-        routeLine = new global.google.maps.Polyline({
-          path: [pos, { lat: destination.latitude, lng: destination.longitude }],
-          strokeColor: '#14a2c3', strokeOpacity: 0.75, strokeWeight: 4, map: map,
+        // Solid line = distance already covered from the station.
+        if (travelledLine) travelledLine.setMap(null);
+        if (originLatLng) {
+          travelledLine = new G.Polyline({
+            path: [originLatLng, pos],
+            strokeColor: '#0f7391', strokeOpacity: 0.85, strokeWeight: 5, map: map, zIndex: 2,
+          });
+        }
+
+        // Dashed remainder from the tanker to the customer.
+        if (plannedLine) plannedLine.setMap(null);
+        plannedLine = new G.Polyline({
+          path: [pos, destLatLng],
+          strokeColor: '#14a2c3', strokeOpacity: 0, strokeWeight: 4, map: map, zIndex: 1,
+          icons: [{
+            icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.6, strokeWeight: 3, scale: 3 },
+            offset: '0', repeat: '14px',
+          }],
         });
 
-        var bounds = new global.google.maps.LatLngBounds();
-        bounds.extend(pos);
-        bounds.extend({ lat: destination.latitude, lng: destination.longitude });
-        map.fitBounds(bounds, 60);
+        // Frame the whole journey once; afterwards let the customer pan freely.
+        if (!fitted) {
+          fitAll(pos);
+          fitted = true;
+        }
       },
       destroy: function () {
         if (driverMarker) driverMarker.setMap(null);
-        if (routeLine) routeLine.setMap(null);
+        if (travelledLine) travelledLine.setMap(null);
+        if (plannedLine) plannedLine.setMap(null);
       },
     };
   }

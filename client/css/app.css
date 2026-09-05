@@ -393,6 +393,47 @@ a { color: var(--aqua-700); }
 .tl-body { padding-bottom: 15px; }
 .tl-title { font-weight: 650; font-size: .9rem; }
 
+/* ---------------- delivery route strip ---------------- */
+
+.route-strip { padding: 2px 2px 0; }
+.route-ends { display: flex; justify-content: space-between; font-size: .76rem; font-weight: 650; color: var(--ink-2); margin-bottom: 7px; }
+.route-end { display: inline-flex; align-items: center; gap: 5px; max-width: 48%; }
+.route-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.route-dot.station { background: var(--navy-900); box-shadow: 0 0 0 2px var(--aqua-200); }
+.route-dot.dest { background: var(--aqua-500); box-shadow: 0 0 0 2px var(--aqua-100); }
+
+.route-track {
+  position: relative; height: 8px; border-radius: var(--r-full);
+  background: repeating-linear-gradient(90deg, rgba(102,128,154,.22) 0 6px, transparent 6px 12px);
+}
+.route-fill {
+  position: absolute; inset: 0 auto 0 0; height: 100%;
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--aqua-700), var(--aqua-400));
+  transition: width 1.1s var(--ease-out);
+  min-width: 3px;
+}
+/* The tanker rides the leading edge of the filled portion. */
+.route-truck {
+  position: absolute; right: 0; top: 50%;
+  transform: translate(50%, -50%);
+  font-size: 17px; line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.28));
+  animation: truck-bob 1.7s ease-in-out infinite;
+}
+@keyframes truck-bob { 0%,100% { transform: translate(50%,-50%) } 50% { transform: translate(50%,-62%) } }
+
+/**
+ * Driver contact block. On phones the Call action stacks full-width instead of
+ * sitting at the right edge, where the floating chat button would cover it.
+ */
+.driver-contact { display: grid; gap: 10px; }
+.driver-contact .btn { width: 100%; }
+@media (min-width: 600px) {
+  .driver-contact { display: flex; align-items: center; }
+  .driver-contact .btn { width: auto; }
+}
+
 /* ---------------- map ---------------- */
 
 .map {
@@ -694,6 +735,17 @@ table.data tbody tr:hover { background: rgba(211,244,250,.42); }
 .bar-label { font-size: .67rem; color: var(--ink-3); }
 
 .split { display: grid; gap: 16px; }
+
+/* Driver job: the fill -> deliver leg */
+.leg { padding: 2px 0 0; }
+.leg-row { display: flex; align-items: flex-start; gap: 9px; }
+.leg-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 5px; }
+.leg-dot.station { background: var(--navy-900); box-shadow: 0 0 0 2px var(--aqua-200); }
+.leg-dot.dest { background: var(--aqua-500); box-shadow: 0 0 0 2px var(--aqua-100); }
+.leg-line {
+  width: 2px; height: 14px; margin-left: 4px;
+  background: repeating-linear-gradient(180deg, var(--aqua-300) 0 3px, transparent 3px 6px);
+}
 
 /* Driver job card */
 .job { border-left: 4px solid var(--aqua-500); }

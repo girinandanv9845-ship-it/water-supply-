@@ -13,6 +13,7 @@ const logger = require('../utils/logger');
 const ORDER_INCLUDE = {
   product: { select: { id: true, name: true, slug: true, capacityL: true, imageEmoji: true } },
   address: { select: { id: true, label: true, fullAddress: true, landmark: true, latitude: true, longitude: true } },
+  station: { select: { id: true, name: true, address: true, latitude: true, longitude: true } },
   customer: { select: { id: true, name: true, phone: true } },
   driver: {
     select: {
@@ -52,16 +53,39 @@ function serializeOrder(order, { viewerRole = 'CUSTOMER' } = {}) {
 
   let etaMinutes = null;
   let distanceKm = null;
+  let routeProgress = null;
+  const liveStatuses = ['DRIVER_ACCEPTED', 'OUT_FOR_DELIVERY', 'ARRIVING'];
+
   if (
     order.driver &&
     Number.isFinite(order.driver.currentLat) &&
     Number.isFinite(order.driver.currentLng) &&
-    ['DRIVER_ACCEPTED', 'OUT_FOR_DELIVERY', 'ARRIVING'].includes(order.status)
+    liveStatuses.includes(order.status)
   ) {
     distanceKm = Number(
       geo.haversineKm(order.driver.currentLat, order.driver.currentLng, order.latitude, order.longitude).toFixed(2)
     );
     etaMinutes = geo.estimateEtaMinutes(distanceKm);
+
+    // How far along the station -> customer leg the tanker is, for the
+    // progress bar on the tracking screen.
+    if (order.station) {
+      const total = geo.haversineKm(
+        order.station.latitude, order.station.longitude, order.latitude, order.longitude
+      );
+      if (total > 0.05) {
+        routeProgress = Math.max(0, Math.min(1, 1 - distanceKm / total));
+        routeProgress = Number(routeProgress.toFixed(3));
+      }
+    }
+  }
+
+  // Distance of the planned leg, shown before the driver starts moving.
+  let routeKm = null;
+  if (order.station) {
+    routeKm = Number(
+      geo.haversineKm(order.station.latitude, order.station.longitude, order.latitude, order.longitude).toFixed(2)
+    );
   }
 
   const payment = order.payments && order.payments[0];
@@ -89,6 +113,18 @@ function serializeOrder(order, { viewerRole = 'CUSTOMER' } = {}) {
     estimatedArrival: order.estimatedArrival,
     etaMinutes,
     distanceKm,
+    routeKm,
+    routeProgress,
+    // Origin of the delivery route: the station the tanker fills at.
+    station: order.station
+      ? {
+          id: order.station.id,
+          name: order.station.name,
+          address: order.station.address,
+          latitude: order.station.latitude,
+          longitude: order.station.longitude,
+        }
+      : null,
     canCancel: fsm.CUSTOMER_CANCELLABLE.has(order.status),
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
@@ -235,12 +271,16 @@ async function createOrder({ customerId, productId, addressId, quantity = 1, not
     throw ApiError.badRequest(serviceable.message);
   }
 
+  // Route origin: the closest filling station to the delivery point.
+  const station = await nearestStation(address.latitude, address.longitude);
+
   const order = await prisma.order.create({
     data: {
       orderNumber: generateOrderNumber(),
       customerId,
       addressId,
       productId,
+      stationId: station ? station.id : null,
       loadType: product.name,
       quantityL: product.capacityL * quantity,
       unitPriceInPaise,
@@ -260,6 +300,26 @@ async function createOrder({ customerId, productId, addressId, quantity = 1, not
 
   sockets.emitToAdmins('admin:order-new', serializeOrder(order, { viewerRole: 'ADMIN' }));
   return order;
+}
+
+/**
+ * Closest active filling station to a delivery point, or null when the
+ * operator has not configured any yet (the app stays usable without them).
+ */
+async function nearestStation(lat, lng) {
+  const stations = await prisma.waterStation.findMany({ where: { isActive: true } });
+  if (stations.length === 0) return null;
+
+  let best = null;
+  let bestKm = Infinity;
+  for (const s of stations) {
+    const km = geo.haversineKm(lat, lng, s.latitude, s.longitude);
+    if (km < bestKm) {
+      bestKm = km;
+      best = s;
+    }
+  }
+  return best;
 }
 
 /** Checks the delivery point against configured service areas. */
@@ -305,6 +365,7 @@ module.exports = {
   getOrderOr404,
   getAuthorizedOrder,
   isServiceable,
+  nearestStation,
   refreshEta,
   generateOrderNumber,
 };

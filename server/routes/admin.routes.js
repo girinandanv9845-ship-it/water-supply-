@@ -186,6 +186,24 @@ router.patch(
 );
 router.delete('/service-areas/:id', validate({ params: idParam }), ctrl.deleteServiceArea);
 
+/* ---------- water stations (delivery route origins) ---------- */
+const stationBody = z.object({
+  name: fields.trimmed(80).min(2),
+  address: fields.trimmed(300).optional().or(z.literal('')),
+  latitude: fields.latitude,
+  longitude: fields.longitude,
+  isActive: z.boolean().default(true),
+});
+
+router.get('/stations', ctrl.listStations);
+router.post('/stations', validate({ body: stationBody }), ctrl.createStation);
+router.patch(
+  '/stations/:id',
+  validate({ params: idParam, body: stationBody.partial() }),
+  ctrl.updateStation
+);
+router.delete('/stations/:id', validate({ params: idParam }), ctrl.deleteStation);
+
 /* ---------- settings / chatbot knowledge ---------- */
 router.get('/business-info', ctrl.getBusinessInfo);
 router.put(

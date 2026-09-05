@@ -700,12 +700,30 @@
       );
     }).join('');
 
+    // Journey strip: water station -> tanker -> customer.
+    var routeStrip = order.station
+      ? '<div class="route-strip mt-2">' +
+        '<div class="route-ends">' +
+        '<span class="route-end"><span class="route-dot station"></span>' + esc(order.station.name) + '</span>' +
+        '<span class="route-end" style="text-align:right"><span class="route-dot dest"></span>' +
+        esc(order.address ? order.address.label : 'You') + '</span></div>' +
+        '<div class="route-track"><div class="route-fill" id="routeFill" style="width:' +
+        Math.round((order.routeProgress || 0) * 100) + '%"><span class="route-truck">&#128666;</span></div></div>' +
+        '<div class="tiny muted mt-1" id="routeNote">' +
+        (order.routeProgress !== null && order.routeProgress !== undefined
+          ? Math.round(order.routeProgress * 100) + '% of the way from the station'
+          : 'Loading at ' + esc(order.station.name) +
+            (order.routeKm ? ' &middot; ' + order.routeKm + ' km to you' : '')) +
+        '</div></div>'
+      : '';
+
     host.innerHTML =
       selector +
       '<div class="card mb-2">' +
       '<div class="row-between mb-1"><span class="small strong">' + esc(order.orderNumber) + '</span>' +
       UI.statusBadge(order.status, order.statusLabel) + '</div>' +
       '<div class="map map-lg" id="trackMap"></div>' +
+      routeStrip +
       '<div class="row-between mt-2">' +
       '<div><div class="tiny muted">Distance</div><div class="strong" id="trackDistance">' +
       (order.distanceKm !== null && order.distanceKm !== undefined ? order.distanceKm + ' km' : 'Waiting for driver') + '</div></div>' +
@@ -714,9 +732,9 @@
       '<div style="text-align:right"><div class="tiny muted">Total</div><div class="strong">' +
       UI.rupees(order.totalRupees) + '</div></div></div>' +
       (order.driver
-        ? '<div class="card-flat mt-2 row"><div class="grow"><div class="tiny muted">Your driver</div>' +
+        ? '<div class="card-flat mt-2 driver-contact"><div class="grow"><div class="tiny muted">Your driver</div>' +
           '<div class="strong">' + esc(order.driver.name) + '</div></div>' +
-          (order.driver.phone ? '<a class="btn btn-ghost btn-sm" href="tel:' + esc(order.driver.phone) + '">Call</a>' : '') + '</div>'
+          (order.driver.phone ? '<a class="btn btn-ghost btn-sm" href="tel:' + esc(order.driver.phone) + '">Call ' + esc(order.driver.name.split(' ')[0]) + '</a>' : '') + '</div>'
         : '<div class="alert alert-info mt-2">We are assigning a tanker to your order.</div>') +
       '</div>' +
       '<div class="card"><h3>Progress</h3><div class="timeline">' + timeline + '</div>' +
@@ -730,7 +748,11 @@
 
     AquaMaps.load().then(function () {
       if (state.tracker) state.tracker.destroy();
-      state.tracker = AquaMaps.createTracker($('trackMap'), { latitude: order.latitude, longitude: order.longitude });
+      state.tracker = AquaMaps.createTracker(
+        $('trackMap'),
+        { latitude: order.latitude, longitude: order.longitude },
+        order.station // route origin: the water station
+      );
       if (order.driver && order.driver.latitude) {
         state.tracker.updateDriver(order.driver.latitude, order.driver.longitude);
       }
@@ -859,8 +881,18 @@
         var eta = $('trackEta');
         if (d) d.textContent = payload.distanceKm + ' km';
         if (eta) eta.textContent = '~' + payload.etaMinutes + ' min';
+
+        // Slide the tanker along the station -> customer progress bar.
+        if (payload.routeProgress !== null && payload.routeProgress !== undefined) {
+          var fill = $('routeFill');
+          var note = $('routeNote');
+          var pct = Math.round(payload.routeProgress * 100);
+          if (fill) fill.style.width = pct + '%';
+          if (note) note.textContent = pct + '% of the way from the station';
+        }
+
         if (state.tracker && state.tracker.available) {
-          state.tracker.updateDriver(payload.latitude, payload.longitude);
+          state.tracker.updateDriver(payload.latitude, payload.longitude, payload.heading);
         }
       },
       notification: function () { loadNotifications(); },

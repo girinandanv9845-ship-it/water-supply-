@@ -70,7 +70,7 @@ test('an unauthenticated socket is rejected at the handshake', async () => {
 
 test('order rooms are private and live updates reach only the right people', async (t) => {
   if (!process.env.ADMIN_SEED_PASSWORD) {
-    t.skip('Set ADMIN_SEED_PASSWORD and DRIVER_SEED_PHONE to run realtime tests');
+    t.skip('ADMIN_SEED_PASSWORD is not set');
     return;
   }
 

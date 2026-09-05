@@ -170,13 +170,31 @@ async function broadcastDriverLocation(driverProfileId, latitude, longitude, hea
       driverId: driverProfileId,
       status: { in: ['DRIVER_ACCEPTED', 'OUT_FOR_DELIVERY', 'ARRIVING'] },
     },
-    select: { id: true, latitude: true, longitude: true },
+    select: {
+      id: true,
+      latitude: true,
+      longitude: true,
+      station: { select: { latitude: true, longitude: true } },
+    },
   });
 
   const at = new Date().toISOString();
 
   for (const order of activeOrders) {
     const distanceKm = haversineKm(latitude, longitude, order.latitude, order.longitude);
+
+    // Progress along the station -> customer leg, so the tracking map can show
+    // how far the tanker has come rather than only how far is left.
+    let routeProgress = null;
+    if (order.station) {
+      const total = haversineKm(
+        order.station.latitude, order.station.longitude, order.latitude, order.longitude
+      );
+      if (total > 0.05) {
+        routeProgress = Number(Math.max(0, Math.min(1, 1 - distanceKm / total)).toFixed(3));
+      }
+    }
+
     io.to(roomForOrder(order.id)).emit('driver:location', {
       orderId: order.id,
       latitude,
@@ -184,6 +202,7 @@ async function broadcastDriverLocation(driverProfileId, latitude, longitude, hea
       heading: heading ?? null,
       distanceKm: Number(distanceKm.toFixed(2)),
       etaMinutes: estimateEtaMinutes(distanceKm),
+      routeProgress,
       at,
     });
   }

@@ -143,6 +143,39 @@ async function main() {
     console.log('  service area: Bengaluru Central (30km)');
   }
 
+  /* ---------- water stations (delivery route origins) ---------- */
+
+  const stationCount = await prisma.waterStation.count();
+  if (stationCount === 0) {
+    const baseLat = Number(process.env.SEED_AREA_LAT || 12.9716);
+    const baseLng = Number(process.env.SEED_AREA_LNG || 77.5946);
+    await prisma.waterStation.createMany({
+      data: [
+        {
+          name: 'Central Filling Point',
+          address: 'Near City Market, Bengaluru',
+          latitude: baseLat + 0.028,
+          longitude: baseLng - 0.021,
+        },
+        {
+          name: 'North Depot',
+          address: 'Hebbal Industrial Area, Bengaluru',
+          latitude: baseLat + 0.075,
+          longitude: baseLng + 0.032,
+        },
+        {
+          name: 'South Borewell Station',
+          address: 'Jayanagar 9th Block, Bengaluru',
+          latitude: baseLat - 0.055,
+          longitude: baseLng - 0.008,
+        },
+      ],
+    });
+    console.log('  water stations: 3');
+  } else {
+    console.log(`  water stations already present: ${stationCount}`);
+  }
+
   /* ---------- chatbot knowledge ---------- */
 
   const existingInfo = await prisma.setting.findUnique({ where: { key: 'businessInfo' } });

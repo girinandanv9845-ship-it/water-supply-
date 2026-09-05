@@ -426,6 +426,31 @@ const deleteServiceArea = asyncHandler(async (req, res) => {
   return ok(res, { deleted: true });
 });
 
+/* ============================ WATER STATIONS ============================ */
+
+const listStations = asyncHandler(async (req, res) => {
+  const stations = await prisma.waterStation.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { orders: true } } },
+  });
+  return ok(res, stations);
+});
+
+const createStation = asyncHandler(async (req, res) =>
+  created(res, await prisma.waterStation.create({ data: req.body }))
+);
+
+const updateStation = asyncHandler(async (req, res) =>
+  ok(res, await prisma.waterStation.update({ where: { id: req.params.id }, data: req.body }))
+);
+
+const deleteStation = asyncHandler(async (req, res) => {
+  // Past orders keep their route origin via onDelete: SetNull, so deleting a
+  // decommissioned station never breaks order history.
+  await prisma.waterStation.delete({ where: { id: req.params.id } });
+  return ok(res, { deleted: true });
+});
+
 /* ============================ SETTINGS / CHATBOT ============================ */
 
 const getBusinessInfo = asyncHandler(async (req, res) => ok(res, await businessInfo.getBusinessInfo()));
@@ -483,6 +508,10 @@ module.exports = {
   createServiceArea,
   updateServiceArea,
   deleteServiceArea,
+  listStations,
+  createStation,
+  updateStation,
+  deleteStation,
   getBusinessInfo,
   updateBusinessInfo,
   listConversations,

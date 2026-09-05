@@ -265,14 +265,35 @@
               '" data-confirm="' + esc(a.confirm || '') + '">' + esc(a.label) + '</button>';
           }).join('');
 
-          var navUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + o.latitude + ',' + o.longitude + '&travelmode=driving';
+          // Before pickup, navigate to the station; after, to the customer.
+          var beforePickup = o.status === 'DRIVER_ASSIGNED' || o.status === 'DRIVER_ACCEPTED';
+          var navTarget = beforePickup && o.station
+            ? { lat: o.station.latitude, lng: o.station.longitude, label: 'Navigate to ' + o.station.name }
+            : { lat: o.latitude, lng: o.longitude, label: 'Navigate to customer' };
+          // Route via the station so the driver gets the full leg once loaded.
+          var origin = !beforePickup && o.station
+            ? '&origin=' + o.station.latitude + ',' + o.station.longitude
+            : '';
+          var navUrl = 'https://www.google.com/maps/dir/?api=1' + origin +
+            '&destination=' + navTarget.lat + ',' + navTarget.lng + '&travelmode=driving';
 
           return '<div class="card job mb-1' + (o.status === 'DRIVER_ASSIGNED' ? ' urgent' : '') + '">' +
             '<div class="row-between mb-1"><span class="small strong">' + esc(o.orderNumber) + '</span>' +
             UI.statusBadge(o.status, o.statusLabel) + '</div>' +
 
             '<div class="strong">' + esc(o.loadType) + ' &middot; ' + UI.litres(o.quantityL) + '</div>' +
-            '<div class="small muted mb-1">' + esc(o.deliveryAddressText) + '</div>' +
+
+            // The leg this job covers: fill here, deliver there.
+            (o.station
+              ? '<div class="leg mb-1"><div class="leg-row"><span class="leg-dot station"></span>' +
+                '<span><span class="tiny muted">Fill at</span><br><span class="small strong">' +
+                esc(o.station.name) + '</span></span></div>' +
+                '<div class="leg-line"></div>' +
+                '<div class="leg-row"><span class="leg-dot dest"></span>' +
+                '<span><span class="tiny muted">Deliver to' +
+                (o.routeKm ? ' &middot; ' + o.routeKm + ' km' : '') + '</span><br><span class="small strong">' +
+                esc(o.deliveryAddressText) + '</span></span></div></div>'
+              : '<div class="small muted mb-1">' + esc(o.deliveryAddressText) + '</div>') +
 
             '<div class="card-flat mb-1" style="padding:9px">' +
             '<div class="row-between small"><span class="muted">Customer</span><span class="strong">' +
@@ -290,7 +311,8 @@
             '</div>' +
 
             (o.isTerminal ? '' :
-              '<a class="btn btn-dark btn-block btn-sm mb-1" href="' + navUrl + '" target="_blank" rel="noopener">Open navigation</a>' +
+              '<a class="btn btn-dark btn-block btn-sm mb-1" href="' + navUrl + '" target="_blank" rel="noopener">' +
+              esc(navTarget.label) + '</a>' +
               '<div class="job-actions">' + actions + '</div>') +
             '</div>';
         }).join('');

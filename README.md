@@ -31,7 +31,8 @@ so no customer ever receives another customer's data.
 - Multiple saved addresses with a default
 - Server-side serviceability check before checkout
 - Razorpay online payment or cash on delivery
-- Live tanker tracking: map, route line, distance and ETA
+- Live tanker tracking: the full water station → your address route,
+  with travelled/remaining legs, distance, ETA and a progress bar
 - Order timeline, order history, cancellation while allowed
 - In-app notifications on every status change
 - AI support assistant grounded in real business data
@@ -44,13 +45,15 @@ so no customer ever receives another customer's data.
 - Manage drivers, tankers, customers, water loads and pricing
 - Payment ledger
 - Service-area management (radius-based)
+- Water-station management — delivery route origins
 - Edit the chatbot's business knowledge base
 - Read support conversation transcripts
 
 **Driver**
 - OTP sign-in, go online/offline
 - Assigned jobs with customer contact and delivery notes
-- One-tap Google Maps navigation
+- Pickup station shown on each job; one-tap navigation to the station
+  before pickup, then to the customer
 - Accept / reject / start / arriving / delivered / failed
 - Toggleable GPS sharing with `watchPosition`, throttled by time *and* movement
 - Delivery history
@@ -128,11 +131,12 @@ water-supply-/
 │   └── utils/                 orderStateMachine, geo, logger, apiResponse
 │
 ├── prisma/
-│   ├── schema.prisma          14 models, enums, indexes
+│   ├── schema.prisma          15 models, enums, indexes
 │   ├── migrations/
-│   └── seed.js                idempotent seed
+│   ├── seed.js                idempotent seed
+│   └── clean.js               wipe demo/test activity
 │
-├── tests/                     48 tests
+├── tests/                     53 tests
 ├── legacy/                    archived v1 (does not run)
 ├── docker-compose.yml         PostgreSQL on port 5434
 ├── .env.example
@@ -248,6 +252,22 @@ Inspect data at any time:
 npm run prisma:studio
 ```
 
+### Clearing demo and test data
+
+Development and testing leave customer accounts and orders behind, which then
+show up in the driver and admin apps. To reset activity without losing your
+configuration:
+
+```bash
+npm run db:clean            # preview what would be deleted
+npm run db:clean -- --yes   # delete
+```
+
+Deletes customer accounts, orders, payments, addresses, notifications and
+support conversations. **Keeps** products and pricing, admin accounts, drivers,
+vehicles, service areas, water stations and the chatbot knowledge base. It
+refuses to run when `NODE_ENV=production`.
+
 ---
 
 ## 9. Running the app
@@ -283,7 +303,33 @@ there is no build step and no bundler to configure.
 
 ---
 
-## 10. Google Maps setup
+## 10. Water stations and delivery routes
+
+Tankers fill at **water stations**. When a customer places an order, the server
+picks the nearest active station and stores it on the order. That station is the
+origin of the route the customer tracks.
+
+The tracking map draws the whole journey rather than only the remaining leg:
+
+```
+[station] ======== solid: distance covered ========> [tanker] - - - dashed - - -> [customer]
+```
+
+The customer also gets a progress strip showing what percentage of the way the
+tanker has come, updated live over the socket. The driver sees the same leg on
+each job, and the navigation button targets the station before pickup and the
+customer afterwards.
+
+Manage stations in **Admin → Water stations**: name, coordinates (or *use my
+current location*), and an active toggle. Disabling a station stops it being
+chosen for new orders without touching past ones; deleting one leaves historical
+orders intact (the reference is nulled, not cascaded).
+
+The seed creates three stations around the configured service-area centre. With
+no stations configured the app still works — orders are simply created without a
+route origin and the map shows only the tanker and the destination.
+
+## 11. Google Maps setup
 
 1. Google Cloud Console → enable **Maps JavaScript API**, **Places API**,
    **Geocoding API**.
@@ -304,7 +350,7 @@ shows live distance and ETA.
 
 ---
 
-## 11. Razorpay setup
+## 12. Razorpay setup
 
 1. Razorpay Dashboard → Settings → API Keys → generate.
 2. Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `.env`.
@@ -329,7 +375,7 @@ record is flagged `isDemo: true` and labelled in the UI.
 
 ---
 
-## 12. AI chatbot setup
+## 13. AI chatbot setup
 
 ```
 AI_PROVIDER=anthropic
@@ -359,7 +405,7 @@ mid-request it degrades to that fallback rather than showing an error.
 
 ---
 
-## 13. Demo mode
+## 14. Demo mode
 
 `DEMO_MODE=true` (default in development):
 
@@ -375,7 +421,7 @@ production.
 
 ---
 
-## 14. Order state machine
+## 15. Order state machine
 
 ```
 PENDING ──▶ CONFIRMED ──▶ DRIVER_ASSIGNED ──▶ DRIVER_ACCEPTED
@@ -397,7 +443,7 @@ checked against both the edge **and** the acting role. Some enforced rules:
 
 ---
 
-## 15. API reference
+## 16. API reference
 
 Responses are always `{ success, data }` or `{ success, error: { code, message } }`.
 
@@ -419,9 +465,9 @@ Responses are always `{ success, data }` or `{ success, error: { code, message }
 | POST | `/api/payments/webhook` | Razorpay (HMAC) |
 | GET | `/api/driver/me`, `/api/driver/orders` | driver |
 | POST | `/api/driver/orders/:id/status`, `/api/driver/location`, `/api/driver/availability` | driver |
-| GET | `/api/admin/stats`, `/live`, `/orders`, `/drivers`, `/vehicles`, `/products`, `/customers`, `/payments`, `/service-areas`, `/business-info`, `/support` | admin |
+| GET | `/api/admin/stats`, `/live`, `/orders`, `/drivers`, `/vehicles`, `/products`, `/customers`, `/payments`, `/service-areas`, `/stations`, `/business-info`, `/support` | admin |
 | POST | `/api/admin/orders/:id/assign-driver`, `/api/admin/orders/:id/status` | admin |
-| POST/PATCH | `/api/admin/drivers`, `/vehicles`, `/products`, `/service-areas`, `/admins` | admin |
+| POST/PATCH/DELETE | `/api/admin/drivers`, `/vehicles`, `/products`, `/service-areas`, `/stations`, `/admins` | admin |
 | POST | `/api/chat` | public (order-aware when signed in) |
 | GET/POST | `/api/notifications`, `/api/notifications/read` | authed |
 | GET | `/api/health` | public |
@@ -447,7 +493,7 @@ Nothing is ever broadcast to all connected sockets.
 
 ---
 
-## 16. Security
+## 17. Security
 
 - Helmet with an explicit CSP allow-listing Google Maps, Razorpay and Socket.IO
 - CORS allow-list, required in production
@@ -473,7 +519,7 @@ order ownership or payment state.
 
 ---
 
-## 17. Testing
+## 18. Testing
 
 ```bash
 # terminal 1
@@ -483,17 +529,18 @@ npm run dev
 npm test
 ```
 
-48 tests: order state machine, geo/ETA, phone normalization, auth, RBAC,
+53 tests: order state machine, geo/ETA, phone normalization, auth, RBAC,
 address privacy, server-side pricing, cross-customer isolation, demo payment
 idempotency, chatbot grounding and order-context scoping, admin dispatch,
-Socket.IO room authorization and live GPS delivery.
+Socket.IO room authorization and live GPS delivery, and water-station
+routing (nearest-station selection, route progress, admin-only access).
 
 Admin and realtime tests need `ADMIN_SEED_PASSWORD` and `DRIVER_SEED_PHONE` in
 the environment; they skip cleanly without them.
 
 ---
 
-## 18. Production deployment
+## 19. Production deployment
 
 1. **Database** — managed PostgreSQL (RDS, Cloud SQL, Neon, Supabase, Railway).
    Set `DATABASE_URL`, then `npx prisma migrate deploy`.
@@ -522,7 +569,7 @@ and unused services are a liability.
 
 ---
 
-## 19. Troubleshooting
+## 20. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -542,7 +589,7 @@ and unused services are a liability.
 
 ---
 
-## 20. What changed from v1
+## 21. What changed from v1
 
 | | v1 | v2 |
 |---|---|---|

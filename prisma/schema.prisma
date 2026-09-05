@@ -162,6 +162,24 @@ model ServiceArea {
   @@index([isActive])
 }
 
+/// A filling point tankers load from. Each order is matched to the nearest
+/// active station at booking time, which becomes the origin of the delivery
+/// route the customer sees on the tracking map.
+model WaterStation {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  latitude  Float
+  longitude Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([isActive])
+}
+
 /* ========================= FLEET ========================= */
 
 model DriverProfile {
@@ -213,6 +231,7 @@ model Order {
   vehicleId   String?
   addressId   String
   productId   String
+  stationId   String?
 
   // Snapshot of catalog data at purchase time - price history must be immutable.
   loadType         String
@@ -248,6 +267,7 @@ model Order {
   vehicle  Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   address  Address        @relation(fields: [addressId], references: [id])
   product  Product        @relation(fields: [productId], references: [id])
+  station  WaterStation?  @relation(fields: [stationId], references: [id], onDelete: SetNull)
 
   payments Payment[]
   events   OrderEvent[]
