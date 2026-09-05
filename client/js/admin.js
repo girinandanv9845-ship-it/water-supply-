@@ -8,6 +8,10 @@
 
   var state = { view: 'dashboard', socket: null, drivers: [], vehicles: [], config: null, liveMap: null, markers: {} };
 
+  // Calmer backdrop here than on the customer app - dense tables come first.
+  if (window.AquaScene) window.AquaScene.init({ preset: 'admin' });
+  document.body.classList.add('scene-immersive');
+
   /* =========================== LOGIN =========================== */
 
   $('adminLoginForm').addEventListener('submit', function (e) {
@@ -67,10 +71,11 @@
       .then(function (s) {
         var maxOrders = Math.max.apply(null, s.series.map(function (d) { return d.orders; }).concat([1]));
         var bars = s.series.map(function (d) {
-          var h = Math.round((d.orders / maxOrders) * 100);
+          // Cap at 76% so the count above and the date below always fit.
+          var h = (d.orders / maxOrders) * 76;
           return '<div class="bar-col" title="' + esc(d.date) + ': ' + d.orders + ' orders">' +
             '<div class="tiny strong">' + d.orders + '</div>' +
-            '<div class="bar" style="height:' + Math.max(h, 3) + '%"></div>' +
+            '<div class="bar" style="height:' + (d.orders ? Math.max(h, 4) : 0) + '%"></div>' +
             '<div class="bar-label">' + esc(d.date.slice(5)) + '</div></div>';
         }).join('');
 
@@ -93,15 +98,42 @@
           stat('Customers', s.totalCustomers, 'registered') +
           '</div>' +
           '<div class="split">' +
-          '<div class="card"><h3>Orders - last 7 days</h3><div class="bars">' + bars + '</div></div>' +
-          '<div class="card"><h3>Orders by status</h3>' + statusRows + '</div></div>');
+          '<div class="card reveal"><h3>Orders - last 7 days</h3><div class="bars">' + bars + '</div></div>' +
+          '<div class="card reveal"><h3>Orders by status</h3>' + statusRows + '</div></div>');
+
+        animateStats();
+        UI.observeReveals(host());
       })
       .catch(function (e) { UI.errorState(host(), e.message, viewDashboard); });
   }
 
+  /**
+   * Stat tiles carry their target in data-count so the value can animate up
+   * from zero without the markup and the animation disagreeing.
+   */
+  function animateStats() {
+    Array.prototype.forEach.call(host().querySelectorAll('.stat .v[data-count]'), function (el) {
+      var target = Number(el.dataset.count);
+      var money = el.dataset.money === '1';
+      UI.countUp(el, target, function (v) {
+        return money ? UI.rupees(Math.round(v)) : String(Math.round(v));
+      });
+    });
+  }
+
   function stat(k, v, d, accent) {
+    // Numeric tiles animate; text tiles (like "3 / 5") render as-is.
+    var numeric = typeof v === 'number';
+    var money = typeof v === 'string' && /^[^\d]*[\d,.]+$/.test(v) && v.indexOf('₹') === 0;
+    var attrs = '';
+    var shown = esc(String(v));
+    if (numeric) { attrs = ' data-count="' + v + '"'; shown = '0'; }
+    else if (money) {
+      var n = Number(String(v).replace(/[^\d.]/g, ''));
+      if (isFinite(n)) { attrs = ' data-count="' + n + '" data-money="1"'; shown = UI.rupees(0); }
+    }
     return '<div class="stat' + (accent ? ' accent' : '') + '"><div class="k">' + esc(k) + '</div>' +
-      '<div class="v">' + esc(String(v)) + '</div><div class="d">' + esc(d) + '</div></div>';
+      '<div class="v"' + attrs + '>' + shown + '</div><div class="d">' + esc(d) + '</div></div>';
   }
 
   /* =========================== ORDERS =========================== */
@@ -796,6 +828,8 @@
   function boot() {
     $('loginView').classList.add('hidden');
     $('consoleView').classList.remove('hidden');
+    // Console content needs the readable scrim; the login screen does not.
+    document.body.classList.remove('scene-immersive');
     UI.watchConnectivity();
 
     API.config().then(function (cfg) {

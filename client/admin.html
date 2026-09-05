@@ -12,11 +12,16 @@
 
 <!-- ================= LOGIN ================= -->
 <section id="loginView">
-  <div style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#0a1a29,#19556d)">
-    <div style="width:100%;max-width:400px">
-      <div class="center" style="color:#fff;margin-bottom:22px">
-        <h1 style="font-size:1.6rem;margin-bottom:2px">AquaFlow Operations</h1>
-        <p class="small" style="opacity:.75;margin:0">Administrator sign-in</p>
+  <div class="auth-stage">
+    <div style="width:100%;max-width:420px">
+      <div class="center auth-hero">
+        <div class="brand-mark auth-logo">
+          <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px">
+            <path d="M12 2.5s6.5 7 6.5 11.2A6.5 6.5 0 0 1 12 20.2a6.5 6.5 0 0 1-6.5-6.5C5.5 9.5 12 2.5 12 2.5z" fill="#fff" opacity=".95"/>
+          </svg>
+        </div>
+        <h1 class="auth-title" style="font-size:1.72rem">AquaFlow Operations</h1>
+        <p class="auth-tagline">Administrator sign-in</p>
       </div>
       <div class="card">
         <form id="adminLoginForm" novalidate>
@@ -35,7 +40,7 @@
           Credentials are created by the seed script. Run <code>npm run db:seed</code> to see them.
         </p>
       </div>
-      <p class="center small mt-2"><a href="/" style="color:rgba(255,255,255,.75)">&larr; Customer app</a></p>
+      <p class="center small mt-2 auth-links"><a href="/">&larr; Customer app</a></p>
     </div>
   </div>
 </section>
@@ -80,6 +85,7 @@
 </section>
 
 <script src="/socket.io/socket.io.js" onerror="window.__noSocket=true"></script>
+<script src="/js/scene3d.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/maps.js"></script>

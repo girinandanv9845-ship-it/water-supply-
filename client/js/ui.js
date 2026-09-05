@@ -229,8 +229,64 @@
     return socket;
   }
 
+  /* ---------------- motion helpers ---------------- */
+
+  var prefersReduced =
+    global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /**
+   * Reveals elements as they scroll into view. Elements are marked with
+   * .reveal; the observer adds .in exactly once, then stops watching them.
+   */
+  var revealObserver = null;
+  function observeReveals(root) {
+    if (prefersReduced || typeof IntersectionObserver === 'undefined') {
+      // Without motion, make sure nothing stays invisible.
+      (root || document).querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    if (!revealObserver) {
+      revealObserver = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) {
+              e.target.classList.add('in');
+              revealObserver.unobserve(e.target);
+            }
+          });
+        },
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.06 }
+      );
+    }
+    (root || document).querySelectorAll('.reveal:not(.in)').forEach(function (el) {
+      revealObserver.observe(el);
+    });
+  }
+
+  /** Counts a number up to its final value. Used for dashboard stats. */
+  function countUp(el, to, format, ms) {
+    if (!el) return;
+    if (prefersReduced) { el.textContent = format ? format(to) : String(to); return; }
+    var from = 0;
+    var dur = ms || 900;
+    var start = null;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      // easeOutExpo
+      var eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+      var v = from + (to - from) * eased;
+      el.textContent = format ? format(v) : String(Math.round(v));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
   global.UI = {
     esc: esc,
+    observeReveals: observeReveals,
+    countUp: countUp,
+    prefersReducedMotion: prefersReduced,
     toast: toast,
     rupees: rupees,
     litres: litres,

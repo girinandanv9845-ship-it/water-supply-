@@ -22,6 +22,9 @@
   var SEND_INTERVAL_MS = 5000;
   var MIN_MOVE_METERS = 15;
 
+  if (window.AquaScene) window.AquaScene.init({ preset: 'driver' });
+  document.body.classList.add('scene-immersive');
+
   /* =========================== LOGIN =========================== */
 
   var pendingPhone = null;
@@ -255,6 +258,7 @@
           return;
         }
 
+        el.classList.add('stagger');
         el.innerHTML = jobs.map(function (o) {
           var actions = (ACTIONS[o.status] || []).map(function (a) {
             return '<button class="btn ' + a.cls + ' btn-sm" data-act="' + esc(o.id) + '" data-to="' + a.to +
@@ -315,6 +319,7 @@
   function boot() {
     $('loginView').classList.add('hidden');
     $('driverView').classList.remove('hidden');
+    document.body.classList.remove('scene-immersive');
     UI.watchConnectivity();
 
     API.config().then(function (cfg) {

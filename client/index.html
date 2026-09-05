@@ -15,15 +15,15 @@
 
   <!-- ================= AUTH ================= -->
   <section id="authView">
-    <div style="min-height:100vh;display:grid;align-content:center;padding:24px;background:linear-gradient(160deg,#0a1a29,#19556d 60%,#1181a4)">
-      <div class="center" style="color:#fff;margin-bottom:26px">
-        <div class="brand-mark" style="width:62px;height:62px;border-radius:18px;margin:0 auto 14px">
-          <svg viewBox="0 0 24 24" fill="none" style="width:34px;height:34px">
+    <div class="auth-stage">
+      <div class="center auth-hero">
+        <div class="brand-mark auth-logo">
+          <svg viewBox="0 0 24 24" fill="none" style="width:36px;height:36px">
             <path d="M12 2.5s6.5 7 6.5 11.2A6.5 6.5 0 0 1 12 20.2a6.5 6.5 0 0 1-6.5-6.5C5.5 9.5 12 2.5 12 2.5z" fill="#fff" opacity=".95"/>
           </svg>
         </div>
-        <h1 style="font-size:1.9rem;margin-bottom:4px">AquaFlow</h1>
-        <p class="small" style="opacity:.8;margin:0">Clean water, delivered and tracked to your door.</p>
+        <h1 class="auth-title">AquaFlow</h1>
+        <p class="auth-tagline">Clean water, delivered and tracked to your door.</p>
       </div>
 
       <div class="card" style="border:none">
@@ -65,9 +65,8 @@
         </div>
       </div>
 
-      <p class="center small mt-2" style="color:rgba(255,255,255,.6)">
-        <a href="/driver" style="color:rgba(255,255,255,.8)">Driver</a> &nbsp;&middot;&nbsp;
-        <a href="/admin" style="color:rgba(255,255,255,.8)">Admin</a>
+      <p class="center small mt-2 auth-links">
+        <a href="/driver">Driver</a> &nbsp;&middot;&nbsp; <a href="/admin">Admin</a>
       </p>
     </div>
   </section>
@@ -104,6 +103,26 @@
       </span>
       <span class="small" style="color:var(--aqua-600);font-weight:700">Change</span>
     </button>
+
+    <div class="app-body">
+
+    <!-- Desktop navigation rail (hidden on mobile, where the bottom bar is used) -->
+    <nav class="side-rail" aria-label="Main">
+      <button class="rail-item active" data-tab="tabHome">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v8h6v-5h2v5h6v-8h3z"/></svg>Order water</button>
+      <button class="rail-item" data-tab="tabOrders">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v3H4zm0 5h16v11H4z"/></svg>My orders</button>
+      <button class="rail-item" data-tab="tabTrack">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-3V5H3v11h2a3 3 0 0 0 6 0h4a3 3 0 0 0 6 0h1v-5zM8 18.5A1.5 1.5 0 1 1 8 15.5a1.5 1.5 0 0 1 0 3zm10 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>Live tracking</button>
+      <button class="rail-item" data-tab="tabAccount">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5z"/></svg>Account
+        <span id="railBadge" class="rail-badge hidden">0</span></button>
+      <div style="border-top:1px solid var(--line);margin:8px 0 4px"></div>
+      <button class="rail-item" id="railChat">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg>Support</button>
+    </nav>
+
+    <main class="app-main">
 
     <!-- ---------- HOME ---------- -->
     <div class="page" id="tabHome">
@@ -184,6 +203,9 @@
       <button class="btn btn-ghost btn-block mt-2" id="logoutBtn2">Sign out</button>
     </div>
 
+    </main>
+    </div>
+
     <button class="chat-fab" id="chatFab" aria-label="Chat with support">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg>
     </button>
@@ -204,6 +226,7 @@
 
 <script src="/socket.io/socket.io.js" onerror="window.__noSocket=true"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js" onerror="window.__noRazorpay=true"></script>
+<script src="/js/scene3d.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/maps.js"></script>

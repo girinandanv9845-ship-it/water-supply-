@@ -14,11 +14,11 @@
 
   <!-- ================= LOGIN ================= -->
   <section id="loginView">
-    <div style="min-height:100vh;display:grid;align-content:center;padding:24px;background:linear-gradient(160deg,#0a1a29,#146885)">
-      <div class="center" style="color:#fff;margin-bottom:24px">
-        <div style="font-size:44px">&#128666;</div>
-        <h1 style="font-size:1.6rem;margin-bottom:2px">Driver</h1>
-        <p class="small" style="opacity:.75;margin:0">Sign in with your registered mobile number</p>
+    <div class="auth-stage">
+      <div class="center auth-hero">
+        <div class="auth-logo" style="font-size:34px">&#128666;</div>
+        <h1 class="auth-title" style="font-size:1.75rem">Driver</h1>
+        <p class="auth-tagline">Sign in with your registered mobile number</p>
       </div>
 
       <div class="card">
@@ -47,7 +47,7 @@
           </form>
         </div>
       </div>
-      <p class="center small mt-2"><a href="/" style="color:rgba(255,255,255,.7)">&larr; Customer app</a></p>
+      <p class="center small mt-2 auth-links"><a href="/">&larr; Customer app</a></p>
     </div>
   </section>
 
@@ -98,6 +98,7 @@
 </div>
 
 <script src="/socket.io/socket.io.js" onerror="window.__noSocket=true"></script>
+<script src="/js/scene3d.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/maps.js"></script>

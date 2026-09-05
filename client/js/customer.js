@@ -31,11 +31,14 @@
   function showAuth() {
     $('authView').classList.remove('hidden');
     $('appView').classList.add('hidden');
+    // Auth screens sit directly on the water, with far less scrim.
+    document.body.classList.add('scene-immersive');
   }
 
   function showApp() {
     $('authView').classList.add('hidden');
     $('appView').classList.remove('hidden');
+    document.body.classList.remove('scene-immersive');
   }
 
   var pendingPhone = null;
@@ -148,18 +151,30 @@
 
   /* =========================== TABS =========================== */
 
-  Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (btn) {
+  // Both the mobile bottom bar and the desktop side rail drive the same tabs.
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-item, .rail-item[data-tab]'), function (btn) {
     btn.addEventListener('click', function () { switchTab(btn.dataset.tab); });
   });
 
+  var railChat = $('railChat');
+  if (railChat) railChat.addEventListener('click', openChat);
+
   function switchTab(tabId) {
     ['tabHome', 'tabOrders', 'tabTrack', 'tabAccount'].forEach(function (id) {
-      $(id).classList.toggle('hidden', id !== tabId);
+      var el = $(id);
+      var show = id === tabId;
+      el.classList.toggle('hidden', !show);
+      if (show) {
+        // Restart the entrance animation on every switch.
+        el.classList.remove('page-enter');
+        void el.offsetWidth;
+        el.classList.add('page-enter');
+      }
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-item, .rail-item[data-tab]'), function (b) {
       b.classList.toggle('active', b.dataset.tab === tabId);
     });
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (tabId === 'tabOrders') loadOrders();
     if (tabId === 'tabTrack') renderTracking();
     if (tabId === 'tabAccount') { loadAddresses(); loadNotifications(); }
@@ -176,6 +191,7 @@
           UI.empty($('productList'), '', 'No water loads available', 'Our team is updating the catalog. Please check back shortly.');
           return;
         }
+        $('productList').classList.add('stagger');
         $('productList').innerHTML = products.map(function (p) {
           return (
             '<button class="product" type="button" data-product="' + esc(p.id) + '" aria-pressed="false">' +
@@ -189,7 +205,13 @@
         }).join('');
 
         Array.prototype.forEach.call($('productList').querySelectorAll('[data-product]'), function (el) {
-          el.addEventListener('click', function () { selectProduct(el.dataset.product); });
+          el.addEventListener('click', function (ev) {
+            // Anchor the selection ripple at the click point.
+            var r = el.getBoundingClientRect();
+            el.style.setProperty('--rx', (((ev.clientX - r.left) / r.width) * 100 || 50) + '%');
+            el.style.setProperty('--ry', (((ev.clientY - r.top) / r.height) * 100 || 50) + '%');
+            selectProduct(el.dataset.product);
+          });
         });
       })
       .catch(function (e) {
@@ -723,9 +745,11 @@
       .then(function (res) {
         state.notifications = res.data;
         var unread = (res.meta && res.meta.unread) || 0;
-        var badge = $('notifBadge');
-        badge.textContent = unread > 9 ? '9+' : String(unread);
-        badge.classList.toggle('hidden', unread === 0);
+        [$('notifBadge'), $('railBadge')].forEach(function (badge) {
+          if (!badge) return;
+          badge.textContent = unread > 9 ? '9+' : String(unread);
+          badge.classList.toggle('hidden', unread === 0);
+        });
 
         var host = $('notificationList');
         if (!res.data.length) { UI.empty(host, '', 'No notifications yet', ''); return; }
@@ -885,6 +909,9 @@
       })
       .catch(function () {});
   }
+
+  // Start the water backdrop immediately - it should be there before sign-in.
+  if (window.AquaScene) window.AquaScene.init({ preset: 'customer' });
 
   API.config()
     .then(function (cfg) {
