@@ -51,6 +51,14 @@ const phone = z
   })
   .pipe(z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number.'));
 
+// Lowercased and trimmed so "User@Gmail.com" and "user@gmail.com" are one account.
+const email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email('Enter a valid email address.')
+  .max(200);
+
 const latitude = z.coerce.number().min(-90).max(90);
 const longitude = z.coerce.number().min(-180).max(180);
 const cuid = z.string().trim().min(1).max(64);
@@ -60,8 +68,23 @@ const pagination = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+/**
+ * Login identity: exactly one of phone or email.
+ * Refusing both prevents an ambiguous request where the two point at different
+ * accounts and the server has to guess which one is being authenticated.
+ */
+function identitySchema(extra) {
+  return z
+    .object(Object.assign({ phone: phone.optional(), email: email.optional() }, extra || {}))
+    .refine((d) => Boolean(d.phone) !== Boolean(d.email), {
+      message: 'Provide either a mobile number or an email address.',
+      path: ['phone'],
+    });
+}
+
 module.exports = {
   validate,
   z,
-  fields: { trimmed, phone, latitude, longitude, cuid, pagination },
+  identitySchema,
+  fields: { trimmed, phone, email, latitude, longitude, cuid, pagination },
 };

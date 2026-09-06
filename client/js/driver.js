@@ -27,7 +27,7 @@
 
   /* =========================== LOGIN =========================== */
 
-  var pendingPhone = null;
+  var pendingIdentity = null;
 
   $('dPhoneForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -38,7 +38,7 @@
 
     API.requestOtp($('dPhoneInput').value.trim())
       .then(function (data) {
-        pendingPhone = data.phone;
+        pendingIdentity = { phone: data.identifier };
         if (data.isNewUser) {
           throw new Error('That number is not registered as a driver. Ask your operations team to add you.');
         }
@@ -46,7 +46,15 @@
         $('dStepOtp').classList.remove('hidden');
         $('dOtpInput').focus();
         if (data.demoCode) {
-          $('dDemoCode').innerHTML = '<div><strong>Demo mode.</strong> Code: <strong style="font-size:1.1rem">' + esc(data.demoCode) + '</strong></div>';
+          $('dDemoCode').className = 'alert alert-warn mb-1';
+          $('dDemoCode').innerHTML =
+            '<div><strong>No SMS gateway configured.</strong> Code: <strong style="font-size:1.15rem;letter-spacing:.15em">' +
+            esc(data.demoCode) + '</strong></div>';
+          $('dDemoCode').classList.remove('hidden');
+        } else {
+          $('dDemoCode').className = 'alert alert-info mb-1';
+          $('dDemoCode').innerHTML =
+            '<div>Code texted to <strong>+91 ' + esc(data.identifier) + '</strong></div>';
           $('dDemoCode').classList.remove('hidden');
         }
       })
@@ -66,7 +74,7 @@
     err.classList.add('hidden');
     UI.busy(btn, true, 'Verifying');
 
-    API.verifyOtp({ phone: pendingPhone, code: $('dOtpInput').value.trim() })
+    API.verifyOtp(Object.assign({}, pendingIdentity, { code: $('dOtpInput').value.trim() }))
       .then(function (data) {
         if (data.user.role !== 'DRIVER') {
           API.clearSession();
@@ -301,7 +309,11 @@
             (o.customer && o.customer.phone
               ? '<div class="row-between small mt-1"><span class="muted">Phone</span>' +
                 '<a class="strong" href="tel:' + esc(o.customer.phone) + '">' + esc(o.customer.phone) + '</a></div>'
-              : '') +
+              : o.customer && o.customer.email
+                // Email-only customer: no number to call, so show the address.
+                ? '<div class="row-between small mt-1"><span class="muted">Email</span>' +
+                  '<a class="strong truncate" href="mailto:' + esc(o.customer.email) + '">' + esc(o.customer.email) + '</a></div>'
+                : '') +
             '<div class="row-between small mt-1"><span class="muted">Amount</span><span class="strong">' +
             UI.rupees(o.totalRupees) + ' (' + (o.paymentMethod === 'CASH_ON_DELIVERY'
               ? 'COLLECT CASH' : (o.paymentStatus === 'PAID' ? 'already paid' : 'unpaid')) + ')</span></div>' +

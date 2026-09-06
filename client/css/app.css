@@ -344,6 +344,26 @@ a { color: var(--aqua-700); }
 @keyframes slide-down { from { opacity: 0; transform: translateY(-5px) } }
 .otp-input { letter-spacing: .55em; text-align: center; font-size: 1.35rem; font-weight: 700; }
 
+/* Segmented control - sign-in method picker */
+.seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: rgba(102,128,154,.10); border-radius: var(--r-sm);
+  padding: 4px; margin: 0 0 14px;
+}
+.seg-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  border: none; background: transparent; cursor: pointer;
+  font: inherit; font-size: .88rem; font-weight: 650; color: var(--ink-3);
+  padding: 9px 10px; border-radius: 7px;
+  transition: background .2s var(--ease-out), color .2s var(--ease-out), box-shadow .2s var(--ease-out);
+}
+.seg-btn svg { width: 16px; height: 16px; }
+.seg-btn:hover { color: var(--ink-2); }
+.seg-btn.active {
+  background: #fff; color: var(--aqua-800);
+  box-shadow: 0 1px 3px rgba(8,32,52,.12);
+}
+
 /* ---------------- badges ---------------- */
 
 .badge {

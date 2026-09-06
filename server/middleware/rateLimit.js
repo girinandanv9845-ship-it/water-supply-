@@ -16,19 +16,30 @@ const shared = {
 /** Broad guard on the whole API surface. */
 const apiLimiter = rateLimit({ ...shared, windowMs: 60 * 1000, max: 300 });
 
-/** OTP request is the most abusable endpoint - keyed by phone, not just IP. */
+/**
+ * OTP endpoints are keyed by IP *and* the identity being targeted, so one
+ * person hammering one address cannot exhaust the budget for everyone else on
+ * the same NAT. Covers both channels - keying on phone alone would drop every
+ * email request into a single shared bucket.
+ */
+function identityKey(req) {
+  const body = req.body || {};
+  const identity = body.phone || body.email || 'unknown';
+  return `${req.ip}:${String(identity).toLowerCase()}`;
+}
+
 const otpRequestLimiter = rateLimit({
   ...shared,
   windowMs: 10 * 60 * 1000,
   max: env.DEMO_MODE ? 50 : 5,
-  keyGenerator: (req) => `${req.ip}:${(req.body && req.body.phone) || 'unknown'}`,
+  keyGenerator: identityKey,
 });
 
 const otpVerifyLimiter = rateLimit({
   ...shared,
   windowMs: 10 * 60 * 1000,
   max: env.DEMO_MODE ? 100 : 10,
-  keyGenerator: (req) => `${req.ip}:${(req.body && req.body.phone) || 'unknown'}`,
+  keyGenerator: identityKey,
 });
 
 const adminLoginLimiter = rateLimit({ ...shared, windowMs: 15 * 60 * 1000, max: 10 });

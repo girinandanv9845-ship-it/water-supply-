@@ -14,7 +14,7 @@ const ORDER_INCLUDE = {
   product: { select: { id: true, name: true, slug: true, capacityL: true, imageEmoji: true } },
   address: { select: { id: true, label: true, fullAddress: true, landmark: true, latitude: true, longitude: true } },
   station: { select: { id: true, name: true, address: true, latitude: true, longitude: true } },
-  customer: { select: { id: true, name: true, phone: true } },
+  customer: { select: { id: true, name: true, phone: true, email: true } },
   driver: {
     select: {
       id: true,
@@ -135,7 +135,14 @@ function serializeOrder(order, { viewerRole = 'CUSTOMER' } = {}) {
     customer:
       viewerRole === 'CUSTOMER'
         ? undefined
-        : order.customer && { id: order.customer.id, name: order.customer.name, phone: order.customer.phone },
+        : order.customer && {
+            id: order.customer.id,
+            name: order.customer.name,
+            // An email-only customer has no phone; staff still need a way to
+            // reach them, so both are exposed and the UI shows what exists.
+            phone: order.customer.phone,
+            email: order.customer.email,
+          },
     driver: order.driver
       ? {
           id: order.driver.id,

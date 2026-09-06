@@ -55,6 +55,8 @@ const env = {
   OTP_TTL_SECONDS: int(process.env.OTP_TTL_SECONDS, 300),
   OTP_MAX_ATTEMPTS: int(process.env.OTP_MAX_ATTEMPTS, 5),
 
+  SMS_PROVIDER: (process.env.SMS_PROVIDER || '').toLowerCase().trim(),
+
   // Driver GPS throttle. The client also throttles; the server enforces it so a
   // misbehaving client cannot flood the socket layer.
   LOCATION_MIN_INTERVAL_MS: int(process.env.LOCATION_MIN_INTERVAL_MS, 3000),
@@ -73,6 +75,26 @@ env.MAPS_ENABLED = Boolean(env.GOOGLE_MAPS_API_KEY);
  * Fail fast on misconfiguration that would otherwise surface as a confusing
  * runtime error (or, worse, as a silent security hole in production).
  */
+/**
+ * Required lazily so this module stays dependency-free at import time
+ * (config/env is loaded very early, by almost everything else).
+ */
+function smsConfigured() {
+  try {
+    return require('../services/sms.service').isConfigured();
+  } catch {
+    return false;
+  }
+}
+
+function emailConfigured() {
+  try {
+    return require('../services/email.service').isConfigured();
+  } catch {
+    return false;
+  }
+}
+
 function validateEnv() {
   const errors = [];
   const warnings = [];
@@ -97,9 +119,26 @@ function validateEnv() {
     if (env.CORS_ORIGINS.length === 0) {
       errors.push('Production requires CORS_ORIGINS (comma-separated list of allowed origins).');
     }
+    // Either channel is enough to log a customer in; requiring both would
+    // block deployments that deliberately run email-only.
+    if (!smsConfigured() && !emailConfigured()) {
+      errors.push(
+        'Production requires at least one OTP delivery channel so customers can sign in. ' +
+          'Configure SMS (SMS_PROVIDER) or email (EMAIL_PROVIDER) - see .env.example.'
+      );
+    }
   } else {
     if (!env.RAZORPAY_ENABLED) {
       warnings.push('Razorpay keys absent - payments run in DEMO mode and are clearly labelled as such.');
+    }
+    if (!smsConfigured() && !emailConfigured()) {
+      warnings.push(
+        'No SMS or email provider configured - OTP codes are shown on screen instead of sent. ' +
+          'Set EMAIL_PROVIDER=gmail (easiest) or SMS_PROVIDER to send real codes.'
+      );
+    } else {
+      if (!smsConfigured()) warnings.push('No SMS gateway - phone sign-in shows the code on screen.');
+      if (!emailConfigured()) warnings.push('No email provider - email sign-in shows the code on screen.');
     }
     if (!env.AI_ENABLED) {
       warnings.push('AI_API_KEY absent - the support chatbot uses the offline rule-based knowledge base.');

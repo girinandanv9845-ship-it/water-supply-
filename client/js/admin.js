@@ -187,7 +187,7 @@
           res.data.map(function (o) {
             return '<tr><td class="strong">' + esc(o.orderNumber) + '</td>' +
               '<td>' + esc(o.customer ? o.customer.name : '-') + '<div class="tiny muted">' +
-              esc(o.customer ? o.customer.phone : '') + '</div></td>' +
+              esc(o.customer ? (o.customer.phone || o.customer.email || '') : '') + '</div></td>' +
               '<td>' + esc(o.loadType) + '<div class="tiny muted">' + UI.litres(o.quantityL) + '</div></td>' +
               '<td class="strong">' + UI.rupees(o.totalRupees) + '</td>' +
               '<td>' + paymentBadge(o) + '</td>' +
@@ -255,7 +255,7 @@
         '<div class="row-between mb-1"><h2 class="mb-0">' + esc(o.orderNumber) + '</h2>' +
         UI.statusBadge(o.status, o.statusLabel) + '</div>' +
         '<div class="card mb-2">' +
-        kv('Customer', (o.customer ? o.customer.name + ' - ' + o.customer.phone : '-')) +
+        kv('Customer', (o.customer ? o.customer.name + ' - ' + (o.customer.phone || o.customer.email || 'no contact') : '-')) +
         kv('Load', o.loadType + ' (' + UI.litres(o.quantityL) + ', qty ' + o.quantity + ')') +
         kv('Amount', UI.rupees(o.totalRupees) + ' - ' + (o.paymentMethod === 'CASH_ON_DELIVERY' ? 'cash on delivery' : o.paymentStatus)) +
         kv('Address', o.deliveryAddressText) +

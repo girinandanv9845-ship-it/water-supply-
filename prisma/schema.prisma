@@ -68,10 +68,12 @@ enum NotificationChannel {
 /* ========================= IDENTITY ========================= */
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  phone        String   @unique
-  email        String?  @unique
+  id   String @id @default(cuid())
+  name String
+  // A customer signs up with a phone OR an email; at least one is always
+  // present, and either can be used to receive a login code.
+  phone String? @unique
+  email String? @unique
   role         Role     @default(CUSTOMER)
   // Only ever populated for ADMIN accounts (bcrypt hash). Customers/drivers use OTP.
   passwordHash String?
@@ -91,20 +93,27 @@ model User {
   @@index([createdAt])
 }
 
+enum OtpChannel {
+  SMS
+  EMAIL
+}
+
 model OtpChallenge {
-  id         String    @id @default(cuid())
-  phone      String
+  id String @id @default(cuid())
+  /// The phone number or email address the code was sent to.
+  identifier String
+  channel    OtpChannel @default(SMS)
   codeHash   String
-  purpose    String    @default("LOGIN")
-  attempts   Int       @default(0)
+  purpose    String     @default("LOGIN")
+  attempts   Int        @default(0)
   consumedAt DateTime?
   expiresAt  DateTime
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime   @default(now())
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([phone, expiresAt])
+  @@index([identifier, expiresAt])
 }
 
 /* ========================= ADDRESSES ========================= */

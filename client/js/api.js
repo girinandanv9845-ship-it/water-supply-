@@ -102,7 +102,11 @@
       return api.get('/api/serviceability?latitude=' + lat + '&longitude=' + lng);
     },
 
-    requestOtp: function (phone) { return api.post('/api/auth/otp/request', { phone: phone }); },
+    // Accepts { phone } or { email }; a bare string is treated as a phone.
+    requestOtp: function (identity) {
+      var body = typeof identity === 'string' ? { phone: identity } : identity;
+      return api.post('/api/auth/otp/request', body);
+    },
     verifyOtp: function (payload) {
       return api.post('/api/auth/otp/verify', payload).then(function (data) {
         api.setSession(data.token, data.user);

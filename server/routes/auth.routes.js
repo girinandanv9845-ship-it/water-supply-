@@ -2,7 +2,7 @@
 
 const express = require('express');
 const ctrl = require('../controllers/auth.controller');
-const { validate, z, fields } = require('../middleware/validate');
+const { validate, z, fields, identitySchema } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { otpRequestLimiter, otpVerifyLimiter, adminLoginLimiter } = require('../middleware/rateLimit');
 
@@ -11,7 +11,7 @@ const router = express.Router();
 router.post(
   '/otp/request',
   otpRequestLimiter,
-  validate({ body: z.object({ phone: fields.phone }) }),
+  validate({ body: identitySchema() }),
   ctrl.requestOtp
 );
 
@@ -19,8 +19,7 @@ router.post(
   '/otp/verify',
   otpVerifyLimiter,
   validate({
-    body: z.object({
-      phone: fields.phone,
+    body: identitySchema({
       code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.'),
       name: fields.trimmed(80).min(2).optional(),
     }),

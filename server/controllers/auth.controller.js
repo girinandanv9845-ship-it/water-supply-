@@ -31,36 +31,62 @@ function publicUser(user) {
 }
 
 /** POST /api/auth/otp/request */
+/**
+ * Zod guarantees exactly one of phone/email is present, so this just says which.
+ * @returns {{ identifier: string, channel: 'SMS'|'EMAIL', where: object }}
+ */
+function resolveIdentity(body) {
+  if (body.email) {
+    return { identifier: body.email, channel: otpService.CHANNEL.EMAIL, where: { email: body.email } };
+  }
+  return { identifier: body.phone, channel: otpService.CHANNEL.SMS, where: { phone: body.phone } };
+}
+
 const requestOtp = asyncHandler(async (req, res) => {
-  const { phone } = req.body;
-  const result = await otpService.requestOtp(phone);
+  const { identifier, channel, where } = resolveIdentity(req.body);
+  const result = await otpService.requestOtp(identifier, channel);
 
   if (!result.delivered) {
-    throw ApiError.unavailable('We could not send the code right now. Please try again shortly.');
+    // The provider's own error text is logged, not returned - it can name the
+    // account, template or balance and is of no use to the customer.
+    const viaEmail = channel === otpService.CHANNEL.EMAIL;
+    throw ApiError.unavailable(
+      result.channel === 'NONE'
+        ? `${viaEmail ? 'Email' : 'SMS'} sign-in is not configured yet. Please contact support.`
+        : 'We could not send your code right now. Please try again in a moment.'
+    );
   }
 
-  const existing = await prisma.user.findUnique({ where: { phone }, select: { id: true, name: true } });
+  const existing = await prisma.user.findUnique({ where, select: { id: true, name: true } });
 
   return ok(res, {
-    phone,
+    identifier,
+    // Kept for older clients; only populated for the channel actually used.
+    phone: channel === otpService.CHANNEL.SMS ? identifier : undefined,
+    email: channel === otpService.CHANNEL.EMAIL ? identifier : undefined,
+    via: channel,
     isNewUser: !existing,
     expiresInSeconds: result.expiresInSeconds,
     channel: result.channel,
+    // True only when the code really left the building.
+    sentToPhone: result.channel === 'SMS',
+    sentToEmail: result.channel === 'EMAIL',
     demoMode: env.DEMO_MODE,
-    // Present only in demo mode - env.js guarantees this is never true in prod.
+    // Present only when no provider is configured and demo mode is on.
     demoCode: result.demoCode,
   });
 });
 
 /** POST /api/auth/otp/verify - signs in, creating the customer on first use. */
 const verifyOtp = asyncHandler(async (req, res) => {
-  const { phone, code, name } = req.body;
+  const { code, name } = req.body;
+  const { identifier, channel, where } = resolveIdentity(req.body);
 
-  const result = await otpService.verifyOtp(phone, code);
+  const result = await otpService.verifyOtp(identifier, code);
   if (!result.ok) throw ApiError.badRequest(result.reason);
 
   let user = await prisma.user.findUnique({
-    where: { phone },
+    where,
     include: { driverProfile: { select: { id: true } } },
   });
 
@@ -71,8 +97,15 @@ const verifyOtp = asyncHandler(async (req, res) => {
       ]);
     }
     // Role is assigned by the server. A client cannot request DRIVER or ADMIN.
+    // Only the verified identifier is stored - the other stays null until the
+    // customer adds it, so an unverified address can never be attached.
     user = await prisma.user.create({
-      data: { phone, name, role: 'CUSTOMER' },
+      data: {
+        name,
+        role: 'CUSTOMER',
+        phone: channel === otpService.CHANNEL.SMS ? identifier : null,
+        email: channel === otpService.CHANNEL.EMAIL ? identifier : null,
+      },
       include: { driverProfile: { select: { id: true } } },
     });
   } else if (!user.isActive) {

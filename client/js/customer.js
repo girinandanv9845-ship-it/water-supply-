@@ -41,43 +41,104 @@
     document.body.classList.remove('scene-immersive');
   }
 
-  var pendingPhone = null;
+  var pendingIdentity = null;
+
+  /**
+   * Renders how the code was delivered. The on-screen code only ever appears
+   * when the server had no SMS gateway to send it through; with a gateway
+   * configured the customer is told to check their handset instead.
+   */
+  function showDeliveryState(data) {
+    var box = $('demoCodeBox');
+    if (data.demoCode) {
+      box.className = 'alert alert-warn mb-1';
+      box.innerHTML =
+        '<div><strong>No ' + (data.via === 'EMAIL' ? 'email' : 'SMS') + ' provider configured.</strong> Your code is ' +
+        '<strong style="font-size:1.15rem;letter-spacing:.15em">' + esc(data.demoCode) + '</strong>' +
+        '<br><span class="tiny">Add credentials on the server and the code is sent for real instead.</span></div>';
+    } else if (data.sentToEmail) {
+      box.className = 'alert alert-info mb-1';
+      box.innerHTML =
+        '<div>We emailed a 6-digit code to <strong>' + esc(data.identifier) + '</strong>.' +
+        '<br><span class="tiny">Check your inbox, and your spam folder if it is not there.</span></div>';
+    } else {
+      box.className = 'alert alert-info mb-1';
+      box.innerHTML =
+        '<div>We texted a 6-digit code to <strong>+91 ' + esc(data.identifier) + '</strong>.' +
+        '<br><span class="tiny">It can take up to a minute to arrive.</span></div>';
+    }
+    box.classList.remove('hidden');
+  }
+
+  // Which identifier the customer is signing in with.
+  var authMode = 'phone';
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    var isPhone = mode === 'phone';
+    $('tabPhone').classList.toggle('active', isPhone);
+    $('tabEmail').classList.toggle('active', !isPhone);
+    $('tabPhone').setAttribute('aria-selected', String(isPhone));
+    $('tabEmail').setAttribute('aria-selected', String(!isPhone));
+    $('phoneField').classList.toggle('hidden', !isPhone);
+    $('emailField').classList.toggle('hidden', isPhone);
+    $('phoneError').classList.add('hidden');
+    $('signInHint').textContent = isPhone
+      ? 'We will send a one-time code to your mobile number.'
+      : 'We will email you a one-time code.';
+    setTimeout(function () { $(isPhone ? 'phoneInput' : 'emailInput').focus(); }, 30);
+  }
+
+  $('tabPhone').addEventListener('click', function () { setAuthMode('phone'); });
+  $('tabEmail').addEventListener('click', function () { setAuthMode('email'); });
 
   $('phoneForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = $('sendOtpBtn');
-    var phone = $('phoneInput').value.trim();
     var err = $('phoneError');
     err.classList.add('hidden');
 
-    if (!/^(\+91|91|0)?[6-9]\d{9}$/.test(phone.replace(/[\s-()]/g, ''))) {
-      err.textContent = 'Enter a valid 10-digit Indian mobile number.';
-      err.classList.remove('hidden');
-      $('phoneInput').setAttribute('aria-invalid', 'true');
-      return;
+    var payload;
+    if (authMode === 'phone') {
+      var phone = $('phoneInput').value.trim();
+      if (!/^(\+91|91|0)?[6-9]\d{9}$/.test(phone.replace(/[\s-()]/g, ''))) {
+        err.textContent = 'Enter a valid 10-digit Indian mobile number.';
+        err.classList.remove('hidden');
+        $('phoneInput').setAttribute('aria-invalid', 'true');
+        return;
+      }
+      $('phoneInput').removeAttribute('aria-invalid');
+      payload = { phone: phone };
+    } else {
+      var mail = $('emailInput').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
+        err.textContent = 'Enter a valid email address.';
+        err.classList.remove('hidden');
+        $('emailInput').setAttribute('aria-invalid', 'true');
+        return;
+      }
+      $('emailInput').removeAttribute('aria-invalid');
+      payload = { email: mail };
     }
-    $('phoneInput').removeAttribute('aria-invalid');
 
     UI.busy(btn, true, 'Sending');
-    API.requestOtp(phone)
+    API.requestOtp(payload)
       .then(function (data) {
-        pendingPhone = data.phone;
-        $('otpPhoneLabel').textContent = data.phone;
+        pendingIdentity = payload;
+        $('otpPhoneLabel').textContent = data.identifier;
         $('nameField').classList.toggle('hidden', !data.isNewUser);
         $('stepPhone').classList.add('hidden');
         $('stepOtp').classList.remove('hidden');
         $('otpInput').value = '';
         $('otpInput').focus();
 
-        if (data.demoCode) {
-          $('demoCodeBox').innerHTML =
-            '<div><strong>Demo mode.</strong> Your code is <strong style="font-size:1.1rem;letter-spacing:.15em">' +
-            esc(data.demoCode) + '</strong><br><span class="tiny">Real SMS delivery is used once an SMS provider is configured.</span></div>';
-          $('demoCodeBox').classList.remove('hidden');
-        } else {
-          $('demoCodeBox').classList.add('hidden');
-        }
-        UI.toast('Code sent to ' + data.phone, 'success');
+        showDeliveryState(data);
+        UI.toast(
+          data.sentToPhone ? 'Code sent to +91 ' + data.identifier
+            : data.sentToEmail ? 'Code emailed to ' + data.identifier
+            : 'Code generated for ' + data.identifier,
+          'success'
+        );
       })
       .catch(function (e2) {
         err.textContent = e2.message;
@@ -92,14 +153,16 @@
   });
 
   $('resendOtp').addEventListener('click', function () {
-    if (!pendingPhone) return;
-    API.requestOtp(pendingPhone)
+    if (!pendingIdentity) return;
+    API.requestOtp(pendingIdentity)
       .then(function (data) {
-        if (data.demoCode) {
-          $('demoCodeBox').innerHTML = '<div><strong>Demo mode.</strong> New code: <strong>' + esc(data.demoCode) + '</strong></div>';
-          $('demoCodeBox').classList.remove('hidden');
-        }
-        UI.toast('A new code has been sent.', 'success');
+        showDeliveryState(data);
+        UI.toast(
+          data.sentToEmail ? 'A new code has been emailed to you.'
+            : data.sentToPhone ? 'A new code has been texted to you.'
+            : 'A new code has been generated.',
+          'success'
+        );
       })
       .catch(function (e) { UI.toast(e.message, 'error'); });
   });
@@ -110,7 +173,8 @@
     var err = $('otpError');
     err.classList.add('hidden');
 
-    var payload = { phone: pendingPhone, code: $('otpInput').value.trim() };
+    // Same identifier the code was sent to - never re-read from the input.
+    var payload = Object.assign({}, pendingIdentity, { code: $('otpInput').value.trim() });
     if (!$('nameField').classList.contains('hidden')) {
       var n = $('nameInput').value.trim();
       if (n.length < 2) {

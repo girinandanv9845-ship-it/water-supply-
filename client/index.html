@@ -30,14 +30,31 @@
         <!-- step 1: phone -->
         <div id="stepPhone">
           <h2>Sign in</h2>
-          <p class="small muted">We will send a one-time code to your mobile number.</p>
+          <p class="small muted" id="signInHint">We will send a one-time code to your mobile number.</p>
+
+          <div class="seg" role="tablist" aria-label="Sign-in method">
+            <button class="seg-btn active" type="button" id="tabPhone" role="tab" aria-selected="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 17a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+              Mobile
+            </button>
+            <button class="seg-btn" type="button" id="tabEmail" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2l-10 6L2 6zm0 2.3V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.3l-10 6-10-6z"/></svg>
+              Email
+            </button>
+          </div>
+
           <form id="phoneForm" novalidate>
-            <div class="field">
+            <div class="field" id="phoneField">
               <label class="label" for="phoneInput">Mobile number</label>
               <input class="input" id="phoneInput" type="tel" inputmode="numeric" autocomplete="tel"
-                     placeholder="10-digit mobile number" maxlength="14" required>
-              <div class="field-error hidden" id="phoneError"></div>
+                     placeholder="10-digit mobile number" maxlength="14">
             </div>
+            <div class="field hidden" id="emailField">
+              <label class="label" for="emailInput">Email address</label>
+              <input class="input" id="emailInput" type="email" inputmode="email" autocomplete="email"
+                     placeholder="you@gmail.com" maxlength="200">
+            </div>
+            <div class="field-error hidden" id="phoneError"></div>
             <button class="btn btn-primary btn-block mt-2" type="submit" id="sendOtpBtn">Send code</button>
           </form>
         </div>
