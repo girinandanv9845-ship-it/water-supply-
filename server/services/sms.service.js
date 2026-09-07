@@ -247,9 +247,32 @@ async function sendOtp(phone, code, ttlSeconds) {
   }
 }
 
+/**
+ * Sends an arbitrary message (order updates, not login codes).
+ * Never throws, for the same reason sendOtp does not.
+ */
+async function send(phone, message) {
+  const provider = activeProvider();
+  if (!provider) return { sent: false, error: 'No SMS provider configured' };
+  try {
+    // `code` is undefined here: template-based gateways (MSG91 flow, Fast2SMS
+    // DLT) are built around OTP templates and will reject free text, so this
+    // path is really only usable on Twilio or a webhook.
+    const result = await provider.send({ phone, message });
+    if (!result.sent) {
+      logger.warn(`SMS to ${maskPhone(phone)} failed via ${provider.name}: ${result.error}`);
+    }
+    return Object.assign({ provider: provider.name }, result);
+  } catch (err) {
+    logger.warn(`SMS to ${maskPhone(phone)} threw via ${provider.name}: ${err.message}`);
+    return { sent: false, provider: provider.name, error: err.message };
+  }
+}
+
 module.exports = {
   providers,
   sendOtp,
+  send,
   isConfigured,
   providerName,
   activeProvider,

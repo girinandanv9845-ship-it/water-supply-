@@ -2,14 +2,20 @@
 
 const { prisma } = require('../config/db');
 const sockets = require('../sockets');
+const sms = require('./sms.service');
+const email = require('./email.service');
 const logger = require('../utils/logger');
 
 /**
  * Channel-agnostic notification dispatch.
  *
- * IN_APP is implemented (persisted + pushed over the socket). SMS / WhatsApp /
- * EMAIL / PUSH are declared as providers with a null implementation, so wiring
- * a real gateway later is a single file change rather than a refactor.
+ * IN_APP is always on (persisted + pushed over the socket). SMS and EMAIL run
+ * through the same gateways as login codes, so configuring one provider covers
+ * both OTPs and order updates.
+ *
+ * External channels are opt-in via NOTIFY_CHANNELS, because every SMS costs
+ * money and an update per status change is six messages a delivery. Example:
+ *   NOTIFY_CHANNELS=IN_APP,EMAIL
  */
 
 const providers = {
@@ -21,22 +27,29 @@ const providers = {
     },
   },
   SMS: {
-    isConfigured: () => Boolean(process.env.SMS_PROVIDER_KEY),
-    async send() {
-      // Wire Twilio/MSG91 here; falls through to IN_APP until configured.
-      return { delivered: false, reason: 'SMS provider not configured' };
+    isConfigured: () => sms.isConfigured(),
+    async send(notification, contact) {
+      if (!contact.phone) return { delivered: false, reason: 'No phone on file' };
+      const result = await sms.send(contact.phone, `${notification.title}: ${notification.body}`);
+      return { delivered: result.sent, reason: result.error };
+    },
+  },
+  EMAIL: {
+    isConfigured: () => email.isConfigured(),
+    async send(notification, contact) {
+      if (!contact.email) return { delivered: false, reason: 'No email on file' };
+      const result = await email.send({
+        to: contact.email,
+        subject: notification.title,
+        text: notification.body,
+      });
+      return { delivered: result.sent, reason: result.error };
     },
   },
   WHATSAPP: {
     isConfigured: () => Boolean(process.env.WHATSAPP_PROVIDER_KEY),
     async send() {
       return { delivered: false, reason: 'WhatsApp provider not configured' };
-    },
-  },
-  EMAIL: {
-    isConfigured: () => Boolean(process.env.SMTP_URL),
-    async send() {
-      return { delivered: false, reason: 'Email provider not configured' };
     },
   },
   PUSH: {
@@ -47,24 +60,51 @@ const providers = {
   },
 };
 
+/** Channels every notification attempts, from NOTIFY_CHANNELS. */
+function defaultChannels() {
+  const raw = (process.env.NOTIFY_CHANNELS || 'IN_APP')
+    .split(',')
+    .map((c) => c.trim().toUpperCase())
+    .filter((c) => providers[c]);
+  // IN_APP is not optional - it is what the bell icon reads from.
+  return raw.includes('IN_APP') ? raw : ['IN_APP'].concat(raw);
+}
+
 /**
  * Persists an in-app notification and fans it out to any configured external
  * channels. Never throws - a failed notification must not fail the order.
  */
-async function notify({ userId, title, body, orderId = null, channels = ['IN_APP'] }) {
+async function notify({ userId, title, body, orderId = null, channels = null }) {
   if (!userId) return null;
   try {
     const record = await prisma.notification.create({
       data: { userId, title, body, orderId, channel: 'IN_APP' },
     });
 
-    for (const channel of channels) {
+    const wanted = channels || defaultChannels();
+
+    // Only look up contact details when an external channel actually needs
+    // them - the common IN_APP-only path stays a single insert.
+    let contact = { phone: null, email: null };
+    if (wanted.some((c) => c !== 'IN_APP')) {
+      contact =
+        (await prisma.user.findUnique({
+          where: { id: userId },
+          select: { phone: true, email: true },
+        })) || contact;
+    }
+
+    for (const channel of wanted) {
       const provider = providers[channel];
       if (!provider) continue;
       if (channel !== 'IN_APP' && !provider.isConfigured()) continue;
       try {
-        await provider.send({ ...record, userId });
+        const result = await provider.send({ ...record, userId }, contact);
+        if (result && !result.delivered && channel !== 'IN_APP') {
+          logger.debug(`Notification channel ${channel} skipped: ${result.reason}`);
+        }
       } catch (err) {
+        // A notification must never fail the order it is reporting on.
         logger.warn(`Notification channel ${channel} failed: ${err.message}`);
       }
     }
@@ -133,4 +173,4 @@ async function notifyPayment(order, success, reason) {
   });
 }
 
-module.exports = { notify, notifyOrderStatus, notifyPayment, providers };
+module.exports = { notify, notifyOrderStatus, notifyPayment, providers, defaultChannels };

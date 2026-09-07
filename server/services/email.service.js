@@ -238,9 +238,34 @@ async function sendOtp(email, code, ttlSeconds) {
   }
 }
 
+/**
+ * Sends an arbitrary email (order updates, not login codes).
+ * Never throws, for the same reason sendOtp does not.
+ */
+async function send({ to, subject, text, html }) {
+  const provider = activeProvider();
+  if (!provider) return { sent: false, error: 'No email provider configured' };
+  try {
+    const result = await provider.send({
+      to,
+      subject,
+      text,
+      html: html || `<p style="font-family:'Segoe UI',Arial,sans-serif;font-size:15px;color:#0d1e2d;">${text}</p>`,
+    });
+    if (!result.sent) {
+      logger.warn(`Email to ${maskEmail(to)} failed via ${providerName()}: ${result.error}`);
+    }
+    return Object.assign({ provider: providerName() }, result);
+  } catch (err) {
+    logger.warn(`Email to ${maskEmail(to)} threw via ${providerName()}: ${err.message}`);
+    return { sent: false, provider: providerName(), error: err.message };
+  }
+}
+
 module.exports = {
   providers,
   sendOtp,
+  send,
   isConfigured,
   providerName,
   activeProvider,

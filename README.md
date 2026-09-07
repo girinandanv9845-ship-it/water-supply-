@@ -13,7 +13,7 @@ Three applications share one Node.js/Express API and one PostgreSQL database:
 
 | App | URL | Sign-in |
 |---|---|---|
-| Customer | `/` | Phone + OTP |
+| Customer | `/` | Phone **or email** + OTP |
 | Operations console | `/admin` | Phone + password |
 | Driver | `/driver` | Phone + OTP |
 
@@ -69,7 +69,7 @@ so no customer ever receives another customer's data.
 | Database | **PostgreSQL 16** |
 | ORM | Prisma 6 |
 | Realtime | Socket.IO 4 |
-| Auth | JWT (7-day) + phone OTP; bcrypt for admin passwords |
+| Auth | JWT (7-day) + OTP by phone or email; bcrypt for admin passwords |
 | Validation | Zod |
 | Security | Helmet (CSP), CORS, express-rate-limit |
 | Payments | Razorpay (server-side signature verification) |
@@ -125,8 +125,8 @@ water-supply-/
 │   ├── routes/                auth, catalog, address, order, payment,
 │   │                          driver, admin, chat, notification
 │   ├── controllers/           auth, order, driver, admin
-│   ├── services/              order, payment, otp, ai, notification,
-│   │                          businessInfo
+│   ├── services/              order, payment, otp, sms, email, ai,
+│   │                          notification, businessInfo
 │   ├── sockets/index.js       authenticated rooms + GPS fan-out
 │   └── utils/                 orderStateMachine, geo, logger, apiResponse
 │
@@ -136,7 +136,7 @@ water-supply-/
 │   ├── seed.js                idempotent seed
 │   └── clean.js               wipe demo/test activity
 │
-├── tests/                     53 tests
+├── tests/                     79 tests
 ├── legacy/                    archived v1 (does not run)
 ├── docker-compose.yml         PostgreSQL on port 5434
 ├── .env.example
@@ -188,7 +188,9 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | prod | Live payments |
 | `RAZORPAY_WEBHOOK_SECRET` | no | Webhook HMAC verification |
 | `AI_PROVIDER` / `AI_API_KEY` / `AI_MODEL` | no | Chatbot; falls back offline |
-| `SMS_PROVIDER_KEY` | no | Real OTP delivery |
+| `SMS_PROVIDER` + credentials | prod* | Real OTP by SMS (MSG91/Twilio/Fast2SMS/webhook) |
+| `EMAIL_PROVIDER` + credentials | prod* | Real OTP by email (Gmail/SMTP/Resend/webhook) |
+| `NOTIFY_CHANNELS` | no | Order updates beyond in-app, e.g. `IN_APP,EMAIL` |
 | `LOCATION_MIN_INTERVAL_MS` | no | Server GPS throttle, default 3000 |
 
 `.env` is gitignored. No secret is hardcoded anywhere in the source.
@@ -529,7 +531,7 @@ npm run dev
 npm test
 ```
 
-53 tests: order state machine, geo/ETA, phone normalization, auth, RBAC,
+79 tests: order state machine, geo/ETA, phone normalization, auth, RBAC,
 address privacy, server-side pricing, cross-customer isolation, demo payment
 idempotency, chatbot grounding and order-context scoping, admin dispatch,
 Socket.IO room authorization and live GPS delivery, and water-station
@@ -552,9 +554,9 @@ the environment; they skip cleanly without them.
    Because Express serves `client/`, one service covers both tiers.
 4. **HTTPS** — required: geolocation and secure cookies need it. Terminate at
    the platform or at nginx.
-5. **SMS** — set `SMS_PROVIDER_KEY` and implement `deliverCode()` in
-   `server/services/otp.service.js`. Without it, OTP cannot be delivered in
-   production and login will fail by design rather than fall back to mock codes.
+5. **OTP delivery** — configure at least one channel, or startup refuses to
+   boot. Email is the quickest: `EMAIL_PROVIDER=gmail` plus `GMAIL_USER` and a
+   Google App Password. SMS additionally needs DLT registration in India.
 6. **Maps** — restrict the browser key to your production domain.
 7. **Webhook** — point Razorpay at `/api/payments/webhook`.
 8. **Health check** — point the platform's probe at `/api/health`; it returns
@@ -581,7 +583,9 @@ and unused services are a liability.
 | npm blocked Prisma install scripts | `npm approve-scripts prisma @prisma/client @prisma/engines` |
 | Map area is a striped placeholder | No `GOOGLE_MAPS_API_KEY`. Everything else still works |
 | `This IP, site or mobile application is not authorized` | Add `http://localhost:3000/*` to the key's referrer restrictions |
-| No OTP received | In demo mode it is on screen and in the log; in production configure `SMS_PROVIDER_KEY` |
+| No OTP received | With no provider it is shown on screen; configure `EMAIL_PROVIDER` or `SMS_PROVIDER` |
+| Gmail rejects the login | Use a 16-char **App Password**, not your account password; 2-Step Verification must be on |
+| SMS accepted but never arrives (India) | DLT registration is missing — the gateway accepts and silently drops it |
 | Live tracking not moving | Driver must be online **and** have location sharing on; the driver's browser needs HTTPS (or localhost) for geolocation |
 | Chatbot says it lacks information | Expected when the fact is not in the knowledge base — add it in Admin → Chatbot & info |
 | Payment window does not open | Razorpay's script was blocked; the order is still saved and payable from *My orders* |
