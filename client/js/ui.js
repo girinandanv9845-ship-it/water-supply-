@@ -30,12 +30,23 @@
     var el = document.createElement('div');
     el.className = 'toast ' + (type || '');
     el.textContent = message;
+    el.title = 'Dismiss';
     host.appendChild(el);
-    setTimeout(function () {
-      el.style.transition = 'opacity .2s';
+
+    var timer = null;
+    function dismiss() {
+      if (timer) clearTimeout(timer);
+      el.style.transition = 'opacity .2s, transform .2s';
       el.style.opacity = '0';
+      el.style.transform = 'translateY(-8px)';
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
-    }, ms || (type === 'error' ? 5000 : 3200));
+    }
+
+    // Tap to clear. Errors linger the longest, and waiting five seconds for a
+    // message you have already read is the most irritating part of a toast.
+    el.addEventListener('click', dismiss);
+    timer = setTimeout(dismiss, ms || (type === 'error' ? 5000 : 3200));
+    return dismiss;
   }
 
   /* ---------------- formatting ---------------- */

@@ -167,6 +167,24 @@
       .catch(function (e) { UI.toast(e.message, 'error'); });
   });
 
+  /**
+   * Digits only, and submit as soon as six are in - including on paste, which
+   * is how most people enter a code copied from their SMS or inbox. Saves a
+   * deliberate tap on the least interesting screen in the app.
+   */
+  (function wireOtpInput() {
+    var input = $('otpInput');
+    input.addEventListener('input', function () {
+      var digits = input.value.replace(/\D/g, '').slice(0, 6);
+      if (digits !== input.value) input.value = digits;
+      // Only auto-submit when a name is not also required, otherwise we would
+      // submit an incomplete new-account form.
+      if (digits.length === 6 && $('nameField').classList.contains('hidden')) {
+        $('otpForm').requestSubmit ? $('otpForm').requestSubmit() : $('verifyOtpBtn').click();
+      }
+    });
+  })();
+
   $('otpForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = $('verifyOtpBtn');
@@ -631,7 +649,10 @@
   function orderCard(o, compact) {
     var payBtn = '';
     if (o.paymentStatus !== 'PAID' && o.paymentMethod === 'ONLINE' && !o.isTerminal) {
-      payBtn = '<button class="btn btn-success btn-sm" data-pay="' + esc(o.id) + '">Pay now</button>';
+      // Name the amount on the button: the customer should never have to
+      // scan back up the card to see what they are about to be charged.
+      payBtn = '<button class="btn btn-success btn-sm" data-pay="' + esc(o.id) + '">Pay ' +
+        UI.rupees(o.totalRupees) + '</button>';
     }
     var trackBtn = !o.isTerminal
       ? '<button class="btn btn-ghost btn-sm" data-track="' + esc(o.id) + '">Track</button>' : '';

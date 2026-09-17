@@ -67,6 +67,18 @@
     $('dStepPhone').classList.remove('hidden');
   });
 
+  // Digits only, and submit on the sixth - drivers sign in one-handed.
+  (function wireDriverOtpInput() {
+    var input = $('dOtpInput');
+    input.addEventListener('input', function () {
+      var digits = input.value.replace(/\D/g, '').slice(0, 6);
+      if (digits !== input.value) input.value = digits;
+      if (digits.length === 6) {
+        $('dOtpForm').requestSubmit ? $('dOtpForm').requestSubmit() : $('dVerify').click();
+      }
+    });
+  })();
+
   $('dOtpForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = $('dVerify');

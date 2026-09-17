@@ -563,7 +563,9 @@ a { color: var(--aqua-700); }
   box-shadow: var(--shadow-lg); font-size: .88rem;
   display: flex; align-items: center; gap: 9px;
   animation: toast-in .38s var(--ease-spring);
+  cursor: pointer;
 }
+@media (hover: hover) { .toast:hover { filter: brightness(1.15); } }
 @keyframes toast-in { from { transform: translateY(-16px) scale(.94); opacity: 0 } }
 .toast.success { background: rgba(11,102,64,.94); }
 .toast.error   { background: rgba(140,32,32,.94); }
