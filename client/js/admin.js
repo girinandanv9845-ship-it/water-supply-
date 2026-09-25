@@ -59,7 +59,36 @@
   }
 
   function section(title, actionHtml, body) {
-    return '<div class="row-between mb-2"><h1 class="mb-0">' + esc(title) + '</h1>' + (actionHtml || '') + '</div>' + body;
+    return '<div class="section-head mb-2"><h1>' + title + '</h1>' +
+      (actionHtml ? '<div class="tools">' + actionHtml + '</div>' : '') + '</div>' + body;
+  }
+
+  /**
+   * Copies each column's header text onto its cells as `data-label`.
+   *
+   * Below 760px the CSS restacks every row into a labelled card, and the label
+   * comes from this attribute. Doing it here - rather than hand-writing
+   * data-label on all 43 cell templates - means new columns and new tables get
+   * the mobile layout for free and cannot drift out of sync with their header.
+   */
+  function labelTables(root) {
+    (root || document).querySelectorAll('table.data').forEach(function (table) {
+      var heads = [].map.call(table.querySelectorAll('thead th'), function (th) {
+        return th.textContent.trim();
+      });
+      if (!heads.length) return;
+      [].forEach.call(table.querySelectorAll('tbody tr'), function (tr) {
+        [].forEach.call(tr.children, function (td, i) {
+          if (!td.hasAttribute('data-label')) td.setAttribute('data-label', heads[i] || '');
+        });
+      });
+    });
+  }
+
+  // One hook for every view: each render replaces #viewHost's contents.
+  if (typeof MutationObserver === 'function' && $('viewHost')) {
+    new MutationObserver(function () { labelTables($('viewHost')); })
+      .observe($('viewHost'), { childList: true, subtree: true });
   }
 
   /* =========================== DASHBOARD =========================== */
@@ -143,8 +172,8 @@
 
   function viewOrders() {
     host().innerHTML = section('Orders',
-      '<div class="row"><input class="input" id="orderSearch" placeholder="Search order, name, phone" style="width:230px" value="' + esc(orderFilter.search) + '">' +
-      '<select class="select" id="orderStatusFilter" style="width:180px"></select></div>',
+      '<input class="input" id="orderSearch" placeholder="Search order, name, phone" style="flex:1 1 220px" value="' + esc(orderFilter.search) + '">' +
+      '<select class="select" id="orderStatusFilter" style="flex:0 1 180px"></select>',
       '<div id="ordersTable"><div class="skeleton skel-card"></div></div>');
 
     var statuses = ['', 'PENDING', 'PAYMENT_FAILED', 'CONFIRMED', 'DRIVER_ASSIGNED', 'DRIVER_ACCEPTED',
@@ -601,7 +630,7 @@
 
   function viewCustomers() {
     host().innerHTML = section('Customers',
-      '<input class="input" id="custSearch" placeholder="Search name or phone" style="width:240px">',
+      '<input class="input" id="custSearch" placeholder="Search name or phone" style="flex:1 1 220px">',
       '<div id="custTable"><div class="skeleton skel-card"></div></div>');
 
     var page = 1, search = '';
